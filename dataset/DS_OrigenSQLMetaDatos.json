@@ -1,0 +1,16 @@
+{
+	"name": "DS_OrigenSQLMetaDatos",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_SQLMetaData",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

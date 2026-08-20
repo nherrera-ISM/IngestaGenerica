@@ -1,0 +1,55 @@
+{
+	"name": "df_ingesta_generica_2lis",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_OrigenSapCdc",
+						"type": "DatasetReference"
+					},
+					"name": "SalidaCdc"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_DestinoSapParquet",
+						"type": "DatasetReference"
+					},
+					"name": "SalidaSapParquet"
+				}
+			],
+			"transformations": [],
+			"scriptLines": [
+				"parameters{",
+				"     ModoEjecucion as string ('fullAndIncrementalLoad'),",
+				"     ColumnaClave as string[] (['ERDAT']),",
+				"     NombreFiltro as string ('ERDAT'),",
+				"     ValorFiltroInicial as string ('20230210'),",
+				"     NombreArchivo as string ('2lis_xx.parquet'),",
+				"     ValorFiltroFinal as string ('20230217')",
+				"}",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     staged: true,",
+				"     readMode: ($ModoEjecucion),",
+				"     keys: ($ColumnaClave),",
+				"     format: 'sapObject',",
+				"     partitionPredicates: ('[[{\"FieldName\": \"' + $NombreFiltro + '\",\"Sign\":\"I\",\"Option\":\"BT\",\"Low\": \"' + $ValorFiltroInicial + '\",\"High\":\"' + $ValorFiltroFinal + '\"}]]'),",
+				"     partitionBy('external', 1)) ~> SalidaCdc",
+				"SalidaCdc sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     format: 'parquet',",
+				"     partitionFileNames:[(concat($NombreArchivo, '.parquet'))],",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     partitionBy('hash', 1)) ~> SalidaSapParquet"
+			]
+		}
+	}
+}

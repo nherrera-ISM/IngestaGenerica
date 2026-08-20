@@ -1,0 +1,23 @@
+{
+	"name": "LS_Databricks",
+	"properties": {
+		"parameters": {
+			"ClusterID": {
+				"type": "string",
+				"defaultValue": "1202-172453-hyzjboca"
+			}
+		},
+		"annotations": [],
+		"type": "AzureDatabricks",
+		"typeProperties": {
+			"domain": "https://adb-8618189448561909.9.azuredatabricks.net",
+			"authentication": "MSI",
+			"workspaceResourceId": "/subscriptions/a9ba1a46-07ac-44d4-86a0-f42199471861/resourceGroups/RG-AEU-HCL-DEV-DATADRIVEN/providers/Microsoft.Databricks/workspaces/DK-AEU-HCL-DEV-DATADRIVEN-01",
+			"existingClusterId": "@linkedService().ClusterID"
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

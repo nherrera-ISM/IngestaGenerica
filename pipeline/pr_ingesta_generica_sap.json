@@ -1,0 +1,1060 @@
+{
+	"name": "pr_ingesta_generica_sap",
+	"properties": {
+		"activities": [
+			{
+				"name": "IngestaExtractorSap",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "IngestaGenerarConsultasSap",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select IdIngestaEjecucion\n\t,Eje.DirectorioDestino\n\t,Eje.NombreArchivoDestino\n\t,REPLACE (Eje.DirectorioDestino, \n\t\tREVERSE(LEFT(REVERSE(Eje.DirectorioDestino), CHARINDEX('/', REVERSE(Eje.DirectorioDestino), CHARINDEX('/', REVERSE(Eje.DirectorioDestino)) + 1) - 0)),'') AS Directorio\n\t,TablaOrigen_Archivo\n\t,EsquemaOrigen_DirectorioRaiz\n\t,SelectEjecutar\n\t,ContenedorDestino\n\t,NombreCuentaAlmacenamiento\n\t,SecretoCuentaAlmacenamiento\n\t,Eje.ConfiguracionAdicionalEjecucion\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion in('SapExtractor')\n\tAnd Eje.Estado = 'Pendiente' And Conf.Estado = 'Activa'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "IngestaExtractorSap",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('IngestaExtractorSap').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "df_ingesta_generica_cdc",
+							"type": "ExecuteDataFlow",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataflow": {
+									"referenceName": "df_ingesta_generica_cdc",
+									"type": "DataFlowReference",
+									"parameters": {
+										"ModoEjecucion": {
+											"value": "'@{json(item().ConfiguracionAdicionalEjecucion).ModoEjecucion}'",
+											"type": "Expression"
+										},
+										"ColumnaClave": {
+											"value": "@json(item().ConfiguracionAdicionalEjecucion).ColumnaClave",
+											"type": "Expression"
+										},
+										"NombreFiltro": {
+											"value": "'@{json(item().ConfiguracionAdicionalEjecucion).NombreFiltro}'",
+											"type": "Expression"
+										},
+										"ValorFiltro": {
+											"value": "'@{json(item().ConfiguracionAdicionalEjecucion).ValorFiltro}'",
+											"type": "Expression"
+										},
+										"NombreArchivo": {
+											"value": "'@{item().NombreArchivoDestino}'",
+											"type": "Expression"
+										}
+									},
+									"datasetParameters": {
+										"SalidaCdc": {
+											"NombreServidorSap": {
+												"value": "@json(item().ConfiguracionAdicionalEjecucion).NombreServidorSap",
+												"type": "Expression"
+											},
+											"NumeroSistema": {
+												"value": "@json(item().ConfiguracionAdicionalEjecucion).NumeroSistema",
+												"type": "Expression"
+											},
+											"Mandante": {
+												"value": "@json(item().ConfiguracionAdicionalEjecucion).Mandante",
+												"type": "Expression"
+											},
+											"NombreUsuario": {
+												"value": "@json(item().ConfiguracionAdicionalEjecucion).NombreUsuario",
+												"type": "Expression"
+											},
+											"NombreSuscriptor": {
+												"value": "@json(item().ConfiguracionAdicionalEjecucion).NombreSuscriptor",
+												"type": "Expression"
+											},
+											"ContextoOdp": {
+												"value": "@item().EsquemaOrigen_DirectorioRaiz",
+												"type": "Expression"
+											},
+											"NombreOdp": {
+												"value": "@item().TablaOrigen_Archivo",
+												"type": "Expression"
+											},
+											"SecretoUsuario": {
+												"value": "@json(item().ConfiguracionAdicionalEjecucion).SecretoUsuario",
+												"type": "Expression"
+											}
+										},
+										"SalidaSapParquet": {
+											"NombreSecretoCtaAlmacenamiento": {
+												"value": "@item().SecretoCuentaAlmacenamiento",
+												"type": "Expression"
+											},
+											"NombreCuentaAlmacenamiento": {
+												"value": "@item().NombreCuentaAlmacenamiento",
+												"type": "Expression"
+											},
+											"NombreArchivo": {
+												"value": "@item().NombreArchivoDestino",
+												"type": "Expression"
+											},
+											"ContenedorDataLake": {
+												"value": "@item().ContenedorDestino",
+												"type": "Expression"
+											},
+											"DirectorioRaizDataLake": {
+												"value": "@item().DirectorioDestino",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								"staging": {
+									"linkedService": {
+										"referenceName": "LS_DataLake",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"NombreSecreto": "NoUsar",
+											"NombreCuentaAlmacenamiento": {
+												"value": "@item().NombreCuentaAlmacenamiento",
+												"type": "Expression"
+											}
+										}
+									},
+									"folderPath": "landing/hocol/registro_informacion_contable/sap/0fi_gl_12"
+								},
+								"compute": {
+									"coreCount": 16,
+									"computeType": "General"
+								},
+								"traceLevel": "None",
+								"cacheSinks": {
+									"firstRowOnly": true
+								},
+								"continuationSettings": {
+									"customizedCheckpointKey": "fa8a43a8-fb7f-4363-b8db-74a7861ee87a"
+								}
+							}
+						},
+						{
+							"name": "CerrarEjecucionExito",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "df_ingesta_generica_cdc",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucionSap]",
+								"storedProcedureParameters": {
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Estado": {
+										"value": "Exito",
+										"type": "String"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@concat('{\"DuracionMiliSeg\":\"'\n        , activity('df_ingesta_generica_cdc').output.runStatus.metrics.SalidaSapParquet.sinkProcessingTime\n        , '\", \"FilasLeídas\":\"'\n        , activity('df_ingesta_generica_cdc').output.runStatus.metrics.SalidaSapParquet.stages[0].recordsRead\n        , '\", \"FilasCopiadas\":\"'\n        , activity('df_ingesta_generica_cdc').output.runStatus.metrics.SalidaSapParquet.rowsWritten\n        , '\" ,\"MensajeUsuario\":\"Carga Exitosa\"  }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "CerrarEjecucionFallo",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "df_ingesta_generica_cdc",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucionSap]",
+								"storedProcedureParameters": {
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@concat('{\"DuracionSeg\":\"'\n        , if(contains(activity('df_ingesta_generica_cdc').output.runStatus.metrics,'SalidaSapParquet.sinkProcessingTime'),activity('df_ingesta_generica_cdc').output.runStatus.metrics.SalidaSapParquet.sinkProcessingTime,0)\n        , '\", \"FilasCopiadas\":\"'\n        , ''\n        , '\", \"MensajeUsuario\":\"'\n        , 'Carga Fallida'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('df_ingesta_generica_cdc').error.Message  \n        ,'\" }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "tr_sap_etls_extractores",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "df_ingesta_generica_cdc",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "tr_sap_etls_extractores",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"columna_filtro": {
+										"value": "@json(item().ConfiguracionAdicionalEjecucion).NombreFiltro",
+										"type": "Expression"
+									},
+									"directorio": {
+										"value": "@item().Directorio",
+										"type": "Expression"
+									},
+									"nombre_archivo": {
+										"value": "@item().NombreArchivoDestino",
+										"type": "Expression"
+									},
+									"nombre_odp": {
+										"value": "@item().TablaOrigen_Archivo",
+										"type": "Expression"
+									},
+									"id_pipeline_adf": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"directorio_landing": {
+										"value": "@item().DirectorioDestino",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Ingesta TablaCompletaSap",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "IngestaGenerarConsultasSap",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select IdIngestaEjecucion\n\t,DirectorioDestino_Ontologia = Eje.DirectorioDestino\n\t,Eje.NombreArchivoDestino\n\t,TablaOrigen_Archivo\n\t,EsquemaOrigen_DirectorioRaiz\n\t,SelectEjecutar\n\t,ContenedorDestino\n\t,NombreCuentaAlmacenamiento\n\t,SecretoCuentaAlmacenamiento\n\t,Eje.ConfiguracionAdicionalEjecucion\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion in('SapTabla')\n\tAnd Eje.Estado = 'Pendiente'\n",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach2",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Ingesta TablaCompletaSap",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Ingesta TablaCompletaSap').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "CopiaSapDataLake",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SapTableSource",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_OrigenSapTabla",
+									"type": "DatasetReference",
+									"parameters": {
+										"NombreServidorSap": {
+											"value": "@json(item().ConfiguracionAdicionalEjecucion).NombreServidorSap",
+											"type": "Expression"
+										},
+										"NumeroSistema": {
+											"value": "@json(item().ConfiguracionAdicionalEjecucion).NumeroSistema",
+											"type": "Expression"
+										},
+										"Mandante": {
+											"value": "@json(item().ConfiguracionAdicionalEjecucion).Mandante",
+											"type": "Expression"
+										},
+										"NombreUsuario": {
+											"value": "@json(item().ConfiguracionAdicionalEjecucion).NombreUsuario",
+											"type": "Expression"
+										},
+										"NombreTabla": {
+											"value": "@item().TablaOrigen_Archivo",
+											"type": "Expression"
+										},
+										"SecreroUsuario": {
+											"value": "@json(item().ConfiguracionAdicionalEjecucion).SecretoUsuario",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_DestinoSapParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"NombreSecretoCtaAlmacenamiento": {
+											"value": "@item().SecretoCuentaAlmacenamiento",
+											"type": "Expression"
+										},
+										"NombreCuentaAlmacenamiento": {
+											"value": "@item().NombreCuentaAlmacenamiento",
+											"type": "Expression"
+										},
+										"NombreArchivo": {
+											"value": "@concat(item().NombreArchivoDestino, '.parquet')",
+											"type": "Expression"
+										},
+										"ContenedorDataLake": {
+											"value": "@item().ContenedorDestino",
+											"type": "Expression"
+										},
+										"DirectorioRaizDataLake": {
+											"value": "@item().DirectorioDestino_Ontologia",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "CerrarEjecucionExito_Tabla",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "CopiaSapDataLake",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucionSap]",
+								"storedProcedureParameters": {
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Estado": {
+										"value": "Exito",
+										"type": "String"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@concat('{\"DuracionSeg\":\"'\n        , activity('CopiaSapDataLake').output.copyDuration\n        , '\", \"FilasLeídas\":\"'\n        , activity('CopiaSapDataLake').output.rowsRead\n        , '\", \"FilasCopiadas\":\"'\n        , activity('CopiaSapDataLake').output.rowsCopied\n        , '\" ,\"MensajeUsuario\":\"Carga Exitosa\"  }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "CerrarEjecucionFallo_Tabla",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "CopiaSapDataLake",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucionSap]",
+								"storedProcedureParameters": {
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@concat('{\"DuracionSeg\":\"'\n        , activity('CopiaSapDataLake').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , ''\n        , '\", \"MensajeUsuario\":\"'\n        , 'Carga Fallida'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('CopiaSapDataLake').error.Message\n        ,'\" }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "tr_sap_etls_tablas_completas",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "CopiaSapDataLake",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "tr_sap_etls_tablas_completas",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"directorio": {
+										"value": "@item().DirectorioDestino_Ontologia",
+										"type": "Expression"
+									},
+									"nombre_archivo": {
+										"value": "@item().NombreArchivoDestino",
+										"type": "Expression"
+									},
+									"nombre_odp": {
+										"value": "@item().TablaOrigen_Archivo",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "ActualizarConfiguracionSap",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "ForEach1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "ForEach2",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "ForEach3",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "Metadata.IngestaActualizarConfiguracionSap",
+					"storedProcedureParameters": {
+						"PipelineRunId": {
+							"value": {
+								"value": "@pipeline().RunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "LS_SQLMetaData",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "IngestaGenerarConsultasSap",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "Metadata.IngestaGenerarConsultasSap",
+					"storedProcedureParameters": {
+						"NombreExtraccion": {
+							"value": {
+								"value": "@pipeline().parameters.NombreExtraccion",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PipelineRunId": {
+							"value": {
+								"value": "@pipeline().RunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Proyecto": {
+							"value": {
+								"value": "@pipeline().parameters.Proyecto",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Tema": {
+							"value": {
+								"value": "@pipeline().parameters.Tema",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "LS_SQLMetaData",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "IngestaExtractorSap2lis",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "IngestaGenerarConsultasSap",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select IdIngestaEjecucion\n\t,Eje.DirectorioDestino\n\t,REPLACE (Eje.DirectorioDestino, \n\t\tREVERSE(LEFT(REVERSE(Eje.DirectorioDestino), CHARINDEX('/', REVERSE(Eje.DirectorioDestino), CHARINDEX('/', REVERSE(Eje.DirectorioDestino)) + 1) - 0)),'') AS Directorio\n\t,Eje.NombreArchivoDestino\n\t,TablaOrigen_Archivo\n\t,EsquemaOrigen_DirectorioRaiz\n\t,SelectEjecutar\n\t,ContenedorDestino\n\t,NombreCuentaAlmacenamiento\n\t,SecretoCuentaAlmacenamiento\n\t,Eje.ConfiguracionAdicionalEjecucion\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion in('SapExtractor2lis')\n\tAnd Eje.Estado = 'Pendiente'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach3",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "IngestaExtractorSap2lis",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('IngestaExtractorSap2lis').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "CerrarEjecucionExito2lis",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "df_ingesta_generica_2lis",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucionSap]",
+								"storedProcedureParameters": {
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Estado": {
+										"value": "Exito",
+										"type": "String"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@concat('{\"DuracionMiliSeg\":\"'\n        , activity('df_ingesta_generica_2lis').output.runStatus.metrics.SalidaSapParquet.sinkProcessingTime\n        , '\", \"FilasLeídas\":\"'\n        , activity('df_ingesta_generica_2lis').output.runStatus.metrics.SalidaSapParquet.stages[0].recordsRead\n        , '\", \"FilasCopiadas\":\"'\n        , activity('df_ingesta_generica_2lis').output.runStatus.metrics.SalidaSapParquet.rowsWritten\n        , '\" ,\"MensajeUsuario\":\"Carga Exitosa\"  }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "CerrarEjecucionFallo2lis",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "df_ingesta_generica_2lis",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucionSap]",
+								"storedProcedureParameters": {
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@concat('{\"DuracionSeg\":\"'\n        , if(contains(activity('df_ingesta_generica_2lis').output.runStatus.metrics,'SalidaSapParquet.sinkProcessingTime'),activity('df_ingesta_generica_2lis').output.runStatus.metrics.SalidaSapParquet.sinkProcessingTime,0)\n        , '\", \"FilasCopiadas\":\"'\n        , ''\n        , '\", \"MensajeUsuario\":\"'\n        , 'Carga Fallida'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('df_ingesta_generica_2lis').error.Message  \n        ,'\" }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "df_ingesta_generica_2lis",
+							"type": "ExecuteDataFlow",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataflow": {
+									"referenceName": "df_ingesta_generica_2lis",
+									"type": "DataFlowReference",
+									"parameters": {
+										"ModoEjecucion": {
+											"value": "'@{json(item().ConfiguracionAdicionalEjecucion).ModoEjecucion}'",
+											"type": "Expression"
+										},
+										"ColumnaClave": {
+											"value": "@json(item().ConfiguracionAdicionalEjecucion).ColumnaClave",
+											"type": "Expression"
+										},
+										"NombreFiltro": {
+											"value": "'@{json(item().ConfiguracionAdicionalEjecucion).NombreFiltro}'",
+											"type": "Expression"
+										},
+										"ValorFiltroInicial": {
+											"value": "'@{json(item().ConfiguracionAdicionalEjecucion).ValorFiltroInicial}'",
+											"type": "Expression"
+										},
+										"NombreArchivo": {
+											"value": "'@{item().NombreArchivoDestino}'",
+											"type": "Expression"
+										},
+										"ValorFiltroFinal": {
+											"value": "'@{json(item().ConfiguracionAdicionalEjecucion).ValorFiltroFinal}'",
+											"type": "Expression"
+										}
+									},
+									"datasetParameters": {
+										"SalidaCdc": {
+											"NombreServidorSap": {
+												"value": "@json(item().ConfiguracionAdicionalEjecucion).NombreServidorSap",
+												"type": "Expression"
+											},
+											"NumeroSistema": {
+												"value": "@json(item().ConfiguracionAdicionalEjecucion).NumeroSistema",
+												"type": "Expression"
+											},
+											"Mandante": {
+												"value": "@json(item().ConfiguracionAdicionalEjecucion).Mandante",
+												"type": "Expression"
+											},
+											"NombreUsuario": {
+												"value": "@json(item().ConfiguracionAdicionalEjecucion).NombreUsuario",
+												"type": "Expression"
+											},
+											"NombreSuscriptor": {
+												"value": "@json(item().ConfiguracionAdicionalEjecucion).NombreSuscriptor",
+												"type": "Expression"
+											},
+											"ContextoOdp": {
+												"value": "@item().EsquemaOrigen_DirectorioRaiz",
+												"type": "Expression"
+											},
+											"NombreOdp": {
+												"value": "@item().TablaOrigen_Archivo",
+												"type": "Expression"
+											},
+											"SecretoUsuario": {
+												"value": "@json(item().ConfiguracionAdicionalEjecucion).SecretoUsuario",
+												"type": "Expression"
+											}
+										},
+										"SalidaSapParquet": {
+											"NombreSecretoCtaAlmacenamiento": "NoUsar",
+											"NombreCuentaAlmacenamiento": {
+												"value": "@item().NombreCuentaAlmacenamiento",
+												"type": "Expression"
+											},
+											"NombreArchivo": {
+												"value": "@item().NombreArchivoDestino",
+												"type": "Expression"
+											},
+											"ContenedorDataLake": {
+												"value": "@item().ContenedorDestino",
+												"type": "Expression"
+											},
+											"DirectorioRaizDataLake": {
+												"value": "@item().DirectorioDestino",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								"staging": {
+									"linkedService": {
+										"referenceName": "LS_DataLake",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"NombreSecreto": "NoUsar",
+											"NombreCuentaAlmacenamiento": {
+												"value": "@item().NombreCuentaAlmacenamiento",
+												"type": "Expression"
+											}
+										}
+									},
+									"folderPath": "landing/hocol/registro_informacion_contable/sap/2lis_13_vdhdr"
+								},
+								"compute": {
+									"coreCount": 16,
+									"computeType": "General"
+								},
+								"traceLevel": "None",
+								"cacheSinks": {
+									"firstRowOnly": true
+								},
+								"continuationSettings": {
+									"customizedCheckpointKey": "17c5a0b7-6435-4287-ac2c-30d14019ab77"
+								}
+							}
+						},
+						{
+							"name": "tr_sap_etls_extractores_2lis",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "df_ingesta_generica_2lis",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "tr_sap_etls_extractores",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"columna_filtro": {
+										"value": "@json(item().ConfiguracionAdicionalEjecucion).NombreFiltro",
+										"type": "Expression"
+									},
+									"directorio": {
+										"value": "@item().Directorio",
+										"type": "Expression"
+									},
+									"nombre_archivo": {
+										"value": "@item().NombreArchivoDestino",
+										"type": "Expression"
+									},
+									"nombre_odp": {
+										"value": "@item().TablaOrigen_Archivo",
+										"type": "Expression"
+									},
+									"id_pipeline_adf": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"directorio_landing": {
+										"value": "@item().DirectorioDestino",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"Proyecto": {
+				"type": "string",
+				"defaultValue": "ExtraccionSap"
+			},
+			"Tema": {
+				"type": "string",
+				"defaultValue": "*"
+			},
+			"NombreExtraccion": {
+				"type": "string",
+				"defaultValue": "*"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": []
+	}
+}

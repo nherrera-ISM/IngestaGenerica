@@ -1,0 +1,7 @@
+{
+	"name": "PE-AEU-HCL-DDRIVEN-DF",
+	"properties": {
+		"privateLinkResourceId": "/subscriptions/a9ba1a46-07ac-44d4-86a0-f42199471861/resourceGroups/RG-AEU-HCL-DEV-DATADRIVEN/providers/Microsoft.Storage/storageAccounts/saaeuhcldevdatadriven02",
+		"groupId": "file"
+	}
+}

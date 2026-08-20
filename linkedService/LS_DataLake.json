@@ -1,0 +1,24 @@
+{
+	"name": "LS_DataLake",
+	"properties": {
+		"parameters": {
+			"NombreSecreto": {
+				"type": "string",
+				"defaultValue": "NoUsar"
+			},
+			"NombreCuentaAlmacenamiento": {
+				"type": "string",
+				"defaultValue": "dlaeuhcldevdatadriven"
+			}
+		},
+		"annotations": [],
+		"type": "AzureBlobFS",
+		"typeProperties": {
+			"url": "@{concat('https://',linkedService().NombreCuentaAlmacenamiento,'.dfs.core.windows.net/')\n\n\n}"
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

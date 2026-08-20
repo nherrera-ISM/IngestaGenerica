@@ -1,0 +1,1786 @@
+{
+	"name": "PR_Mover_Archivo",
+	"properties": {
+		"description": "Canalización para realizar la ingesta genérica de diferentes fuentes.",
+		"activities": [
+			{
+				"name": "IngestaEjecucion MoverArchivos",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select IdIngestaEjecucion\n\t,SecretoKeyVConexionOrigen\n\t,NombreCuentaAlmacenamientoOrigen\n\t,ContenedorOrigen\n\t,DirectorioOrigen = Eje.SelectEjecutar\n\t,ArchivoOrigen = Eje.ArchivoOrigen\n\t,SecretoCuentaAlmacenamiento\n\t,NombreCuentaAlmacenamiento\n\t,ContenedorDestino\n\t,Eje.DirectorioDestino\n\t,Eje.NombreArchivoDestino\n\t,COALESCE(JSON_VALUE(ConfiguracionAdicional,'$.BorrarOrigen'),'No') as BorrarOrigen\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion in ('MoverArchivo')\n\tAnd Proyecto = '@{pipeline().parameters.Proyecto}'\n\tAnd Tema = Case When '@{pipeline().parameters.Tema}' ='*' Then Tema Else '@{pipeline().parameters.Tema}' End\n\tAnd  NombreExtraccion = Case When '@{pipeline().parameters.NombreExtraccion}' = '*' Then NombreExtraccion Else '@{pipeline().parameters.NombreExtraccion}' End \n\tAnd Eje.Estado = 'Pendiente'\n",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Para Cada Archivo a Mover",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "IngestaEjecucion MoverArchivos",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('IngestaEjecucion MoverArchivos').output.value",
+						"type": "Expression"
+					},
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "ValidarSiArchivoExiste",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "DS_OrigenArchivoBinario",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@item().ContenedorOrigen",
+											"type": "Expression"
+										},
+										"Directory": {
+											"value": "@item().DirectorioOrigen",
+											"type": "Expression"
+										},
+										"filename": {
+											"value": "@item().ArchivoOrigen",
+											"type": "Expression"
+										},
+										"NombreCuentaAlmacenamiento": {
+											"value": "@item().NombreCuentaAlmacenamientoOrigen",
+											"type": "Expression"
+										},
+										"NombreSecreto": {
+											"value": "@item().SecretoKeyVConexionOrigen",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"exists"
+								],
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							}
+						},
+						{
+							"name": "ExisteArchivoAMover",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "ValidarSiArchivoExiste",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [
+								{
+									"name": "ArchivoOrigen",
+									"value": "@item().ArchivoOrigen"
+								},
+								{
+									"name": "DirectorioOrigen",
+									"value": "@item().DirectorioOrigen"
+								},
+								{
+									"name": "ContenedorOrigen",
+									"value": "@item().ContenedorOrigen"
+								},
+								{
+									"name": "ArchivoExiste",
+									"value": "@activity('ValidarSiArchivoExiste').output.exists"
+								}
+							],
+							"typeProperties": {
+								"expression": {
+									"value": "@activity('ValidarSiArchivoExiste').output.exists",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "CerrarConFalloExcel_ArchivoNoEncontrado",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.00:12:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "ArchivoOrigen",
+												"value": "@item().ArchivoOrigen"
+											}
+										],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Error",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"MensajeUsuario\":\"El archivo no existe en el origen\"}')",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "MoverArchivo",
+										"description": "Copiar archivo y pegarlo en el destino",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "ArchivoOrigen",
+												"value": "@item().ArchivoOrigen"
+											},
+											{
+												"name": "DirectorioOrigen",
+												"value": "@item().DirectorioOrigen"
+											},
+											{
+												"name": "ContenedorOrigen",
+												"value": "@item().ContenedorOrigen"
+											},
+											{
+												"name": "ContenedorDestino",
+												"value": "@item().ContenedorDestino"
+											},
+											{
+												"name": "DirectorioDestino",
+												"value": "@item().DirectorioDestino"
+											}
+										],
+										"typeProperties": {
+											"source": {
+												"type": "BinarySource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true
+												},
+												"formatSettings": {
+													"type": "BinaryReadSettings"
+												},
+												"recursive": false
+											},
+											"sink": {
+												"type": "BinarySink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												}
+											},
+											"enableStaging": false,
+											"dataIntegrationUnits": 0
+										},
+										"inputs": [
+											{
+												"referenceName": "DS_OrigenArchivoBinario",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": {
+														"value": "@item().ContenedorOrigen",
+														"type": "Expression"
+													},
+													"Directory": {
+														"value": "@item().DirectorioOrigen",
+														"type": "Expression"
+													},
+													"filename": {
+														"value": "@item().ArchivoOrigen",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamiento": {
+														"value": "@item().NombreCuentaAlmacenamientoOrigen",
+														"type": "Expression"
+													},
+													"NombreSecreto": {
+														"value": "@item().SecretoKeyVConexionOrigen",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "DS_DestinoArchivoBinario",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": {
+														"value": "@item().ContenedorDestino",
+														"type": "Expression"
+													},
+													"Directory": {
+														"value": "@item().DirectorioDestino",
+														"type": "Expression"
+													},
+													"filename": {
+														"value": "@item().NombreArchivoDestino",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamientoDestino": {
+														"value": "@item().NombreCuentaAlmacenamiento",
+														"type": "Expression"
+													},
+													"SecretoKeyVConexionDestino": {
+														"value": "@item().SecretoCuentaAlmacenamiento",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "CerrarConExitoMover",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "MoverArchivo",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Exito",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"MensajeUsuario\":\"Movimiento Exitoso\"  }'\n)",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "ValidarBorrarArchivo",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "ExisteArchivoAMover",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [
+								{
+									"name": "ArchivoOrigen",
+									"value": "@item().ArchivoOrigen"
+								},
+								{
+									"name": "DirectorioOrigen",
+									"value": "@item().DirectorioOrigen"
+								},
+								{
+									"name": "ContenedorOrigen",
+									"value": "@item().ContenedorOrigen"
+								},
+								{
+									"name": "BorrarOrigen",
+									"value": "@item().BorrarOrigen"
+								},
+								{
+									"name": "ArchivoExiste",
+									"value": "@activity('ValidarSiArchivoExiste').output.exists"
+								}
+							],
+							"typeProperties": {
+								"expression": {
+									"value": "@and(activity('ValidarSiArchivoExiste').output.exists,equals(item().BorrarOrigen,'Si'))",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "BorrarArchivo",
+										"description": "Si se tiene la opción habilitada de borrar el archivo, se elimina con esta tarea",
+										"type": "Delete",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "ArchivoOrigen",
+												"value": "@item().ArchivoOrigen"
+											},
+											{
+												"name": "BorrarOrigen",
+												"value": "@item().BorrarOrigen"
+											}
+										],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "DS_OrigenArchivoBinario",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": {
+														"value": "@item().ContenedorOrigen",
+														"type": "Expression"
+													},
+													"Directory": {
+														"value": "@item().DirectorioOrigen",
+														"type": "Expression"
+													},
+													"filename": {
+														"value": "@item().ArchivoOrigen",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamiento": {
+														"value": "@item().NombreCuentaAlmacenamientoOrigen",
+														"type": "Expression"
+													},
+													"NombreSecreto": {
+														"value": "@item().SecretoKeyVConexionOrigen",
+														"type": "Expression"
+													}
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true
+											}
+										}
+									},
+									{
+										"name": "CerrarConExitoBorrar",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "BorrarArchivo",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Exito",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"MensajeUsuario\":\"Borrado Exitoso\"  }'\n)",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "CerrarConFalloMover",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "ExisteArchivoAMover",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('\"\"MensajeUsuario\":\"'\n        , 'Movimiento Fallido'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('MoverArchivo').error.Message  \n        ,'\" }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "CerrarConFalloMover2",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "ValidarBorrarArchivo",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('\"MensajeUsuario\":\"'\n        , 'Movimiento Fallido'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('BorrarArchivo').error.Message  \n        ,'\" }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Para Cada Archivo a Mover FileShares",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "IngestaEjecucion MoverArchivosFS",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('IngestaEjecucion MoverArchivosFS').output.value",
+						"type": "Expression"
+					},
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "ValidarSiArchivoExisteFS",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "DS_OrigenArchivoBinarioFS",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@item().ContenedorOrigen",
+											"type": "Expression"
+										},
+										"Directory": {
+											"value": "@item().DirectorioOrigen",
+											"type": "Expression"
+										},
+										"filename": {
+											"value": "@item().ArchivoOrigen",
+											"type": "Expression"
+										},
+										"NombreCuentaAlmacenamiento": {
+											"value": "@item().NombreCuentaAlmacenamientoOrigen",
+											"type": "Expression"
+										},
+										"NombreSecreto": {
+											"value": "@item().SecretoKeyVConexionOrigen",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"exists"
+								],
+								"storeSettings": {
+									"type": "AzureFileStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							}
+						},
+						{
+							"name": "ExisteArchivoAMoverFS",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "ValidarSiArchivoExisteFS",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [
+								{
+									"name": "ArchivoOrigen",
+									"value": "@item().ArchivoOrigen"
+								},
+								{
+									"name": "DirectorioOrigen",
+									"value": "@item().DirectorioOrigen"
+								},
+								{
+									"name": "ContenedorOrigen",
+									"value": "@item().ContenedorOrigen"
+								},
+								{
+									"name": "ArchivoExiste",
+									"value": "@activity('ValidarSiArchivoExisteFS').output.exists"
+								}
+							],
+							"typeProperties": {
+								"expression": {
+									"value": "@activity('ValidarSiArchivoExisteFS').output.exists",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "CerrarConFalloExcel_ArchivoNoEncontradoFS",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.00:12:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "ArchivoOrigen",
+												"value": "@item().ArchivoOrigen"
+											}
+										],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Error",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"MensajeUsuario\":\"El archivo no existe en el origen\"}')",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "MoverArchivoFS",
+										"description": "Copiar archivo y pegarlo en el destino",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "ArchivoOrigen",
+												"value": "@item().ArchivoOrigen"
+											},
+											{
+												"name": "DirectorioOrigen",
+												"value": "@item().DirectorioOrigen"
+											},
+											{
+												"name": "ContenedorOrigen",
+												"value": "@item().ContenedorOrigen"
+											},
+											{
+												"name": "ContenedorDestino",
+												"value": "@item().ContenedorDestino"
+											},
+											{
+												"name": "DirectorioDestino",
+												"value": "@item().DirectorioDestino"
+											}
+										],
+										"typeProperties": {
+											"source": {
+												"type": "BinarySource",
+												"storeSettings": {
+													"type": "AzureFileStorageReadSettings",
+													"recursive": true
+												},
+												"formatSettings": {
+													"type": "BinaryReadSettings"
+												},
+												"recursive": false
+											},
+											"sink": {
+												"type": "BinarySink",
+												"storeSettings": {
+													"type": "AzureFileStorageWriteSettings"
+												}
+											},
+											"enableStaging": false,
+											"dataIntegrationUnits": 0
+										},
+										"inputs": [
+											{
+												"referenceName": "DS_OrigenArchivoBinarioFS",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": {
+														"value": "@item().ContenedorOrigen",
+														"type": "Expression"
+													},
+													"Directory": {
+														"value": "@item().DirectorioOrigen",
+														"type": "Expression"
+													},
+													"filename": {
+														"value": "@item().ArchivoOrigen",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamiento": {
+														"value": "@item().NombreCuentaAlmacenamientoOrigen",
+														"type": "Expression"
+													},
+													"NombreSecreto": {
+														"value": "@item().SecretoKeyVConexionOrigen",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "DS_DestinoArchivoBinarioFS",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": {
+														"value": "@item().ContenedorDestino",
+														"type": "Expression"
+													},
+													"Directory": {
+														"value": "@item().DirectorioDestino",
+														"type": "Expression"
+													},
+													"filename": {
+														"value": "@item().NombreArchivoDestino",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamientoDestino": {
+														"value": "@item().NombreCuentaAlmacenamiento",
+														"type": "Expression"
+													},
+													"NombreSecreto": {
+														"value": "@item().SecretoKeyVConexionOrigen",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "CerrarConExitoMoverFS",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "MoverArchivoFS",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Exito",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"MensajeUsuario\":\"Movimiento Exitoso\"  }'\n)",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "ValidarBorrarArchivoFS",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "ExisteArchivoAMoverFS",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [
+								{
+									"name": "ArchivoOrigen",
+									"value": "@item().ArchivoOrigen"
+								},
+								{
+									"name": "DirectorioOrigen",
+									"value": "@item().DirectorioOrigen"
+								},
+								{
+									"name": "ContenedorOrigen",
+									"value": "@item().ContenedorOrigen"
+								},
+								{
+									"name": "BorrarOrigen",
+									"value": "@item().BorrarOrigen"
+								},
+								{
+									"name": "ArchivoExiste",
+									"value": "@activity('ValidarSiArchivoExisteFS').output.exists"
+								}
+							],
+							"typeProperties": {
+								"expression": {
+									"value": "@and(activity('ValidarSiArchivoExisteFS').output.exists,equals(item().BorrarOrigen,'Si'))",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "BorrarArchivoFS",
+										"description": "Si se tiene la opción habilitada de borrar el archivo, se elimina con esta tarea",
+										"type": "Delete",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "ArchivoOrigen",
+												"value": "@item().ArchivoOrigen"
+											},
+											{
+												"name": "BorrarOrigen",
+												"value": "@item().BorrarOrigen"
+											}
+										],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "DS_OrigenArchivoBinarioFS",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": {
+														"value": "@item().ContenedorOrigen",
+														"type": "Expression"
+													},
+													"Directory": {
+														"value": "@item().DirectorioOrigen",
+														"type": "Expression"
+													},
+													"filename": {
+														"value": "@item().ArchivoOrigen",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamiento": {
+														"value": "@item().NombreCuentaAlmacenamientoOrigen",
+														"type": "Expression"
+													},
+													"NombreSecreto": {
+														"value": "@item().SecretoKeyVConexionOrigen",
+														"type": "Expression"
+													}
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureFileStorageReadSettings",
+												"recursive": true
+											}
+										}
+									},
+									{
+										"name": "CerrarConExitoBorrarFS",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "BorrarArchivoFS",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Exito",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"MensajeUsuario\":\"Borrado Exitoso\"  }'\n)",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "CerrarConFalloMoverFS",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "ExisteArchivoAMoverFS",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('\"\"MensajeUsuario\":\"'\n        , 'Movimiento Fallido'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('MoverArchivoFS').error.Message  \n        ,'\" }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "CerrarConFalloMoverFS2",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "ValidarBorrarArchivoFS",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('\"MensajeUsuario\":\"'\n        , 'Movimiento Fallido'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('BorrarArchivoFS').error.Message  \n        ,'\" }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "IngestaEjecucion MoverArchivosFS",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select IdIngestaEjecucion\n\t,SecretoKeyVConexionOrigen\n\t,NombreCuentaAlmacenamientoOrigen\n\t,ContenedorOrigen\n\t,DirectorioOrigen = Eje.SelectEjecutar\n\t,ArchivoOrigen = Eje.ArchivoOrigen\n\t,SecretoCuentaAlmacenamiento\n\t,NombreCuentaAlmacenamiento\n\t,ContenedorDestino\n\t,Eje.DirectorioDestino\n\t,Eje.NombreArchivoDestino\n\t,COALESCE(JSON_VALUE(ConfiguracionAdicional,'$.BorrarOrigen'),'No') as BorrarOrigen\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion in ('MoverArchivoFS')\n\tAnd Proyecto = '@{pipeline().parameters.Proyecto}'\n\tAnd Tema = Case When '@{pipeline().parameters.Tema}' ='*' Then Tema Else '@{pipeline().parameters.Tema}' End\n\tAnd  NombreExtraccion = Case When '@{pipeline().parameters.NombreExtraccion}' = '*' Then NombreExtraccion Else '@{pipeline().parameters.NombreExtraccion}' End \n\tAnd Eje.Estado = 'Pendiente'\n",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Para Cada Archivo a Mover FileShares a DL",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "IngestaEjecucion MoverArchivosFSDL",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('IngestaEjecucion MoverArchivosFSDL').output.value",
+						"type": "Expression"
+					},
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "ValidarSiArchivoExisteFSDL",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "DS_OrigenArchivoBinarioFS",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@item().ContenedorOrigen",
+											"type": "Expression"
+										},
+										"Directory": {
+											"value": "@item().DirectorioOrigen",
+											"type": "Expression"
+										},
+										"filename": {
+											"value": "@item().ArchivoOrigen",
+											"type": "Expression"
+										},
+										"NombreCuentaAlmacenamiento": {
+											"value": "@item().NombreCuentaAlmacenamientoOrigen",
+											"type": "Expression"
+										},
+										"NombreSecreto": {
+											"value": "@item().SecretoKeyVConexionOrigen",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"exists"
+								],
+								"storeSettings": {
+									"type": "AzureFileStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							}
+						},
+						{
+							"name": "ExisteArchivoAMoverFSDL",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "ValidarSiArchivoExisteFSDL",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [
+								{
+									"name": "ArchivoOrigen",
+									"value": "@item().ArchivoOrigen"
+								},
+								{
+									"name": "DirectorioOrigen",
+									"value": "@item().DirectorioOrigen"
+								},
+								{
+									"name": "ContenedorOrigen",
+									"value": "@item().ContenedorOrigen"
+								},
+								{
+									"name": "ArchivoExiste",
+									"value": "@activity('ValidarSiArchivoExisteFSDL').output.exists"
+								}
+							],
+							"typeProperties": {
+								"expression": {
+									"value": "@activity('ValidarSiArchivoExisteFSDL').output.exists",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "CerrarConFalloExcel_ArchivoNoEncontradoFSDL",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.00:12:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "ArchivoOrigen",
+												"value": "@item().ArchivoOrigen"
+											}
+										],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Error",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"MensajeUsuario\":\"El archivo no existe en el origen\"}')",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "MoverArchivoFSDL",
+										"description": "Copiar archivo y pegarlo en el destino",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "ArchivoOrigen",
+												"value": "@item().ArchivoOrigen"
+											},
+											{
+												"name": "DirectorioOrigen",
+												"value": "@item().DirectorioOrigen"
+											},
+											{
+												"name": "ContenedorOrigen",
+												"value": "@item().ContenedorOrigen"
+											},
+											{
+												"name": "ContenedorDestino",
+												"value": "@item().ContenedorDestino"
+											},
+											{
+												"name": "DirectorioDestino",
+												"value": "@item().DirectorioDestino"
+											}
+										],
+										"typeProperties": {
+											"source": {
+												"type": "BinarySource",
+												"storeSettings": {
+													"type": "AzureFileStorageReadSettings",
+													"recursive": true
+												},
+												"formatSettings": {
+													"type": "BinaryReadSettings"
+												},
+												"recursive": false
+											},
+											"sink": {
+												"type": "BinarySink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												}
+											},
+											"enableStaging": false,
+											"dataIntegrationUnits": 0
+										},
+										"inputs": [
+											{
+												"referenceName": "DS_OrigenArchivoBinarioFS",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": {
+														"value": "@item().ContenedorOrigen",
+														"type": "Expression"
+													},
+													"Directory": {
+														"value": "@item().DirectorioOrigen",
+														"type": "Expression"
+													},
+													"filename": {
+														"value": "@item().ArchivoOrigen",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamiento": {
+														"value": "@item().NombreCuentaAlmacenamientoOrigen",
+														"type": "Expression"
+													},
+													"NombreSecreto": {
+														"value": "@item().SecretoKeyVConexionOrigen",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "DS_DestinoArchivoBinario",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": {
+														"value": "@item().ContenedorDestino",
+														"type": "Expression"
+													},
+													"Directory": {
+														"value": "@item().DirectorioDestino",
+														"type": "Expression"
+													},
+													"filename": {
+														"value": "@item().NombreArchivoDestino",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamientoDestino": {
+														"value": "@item().NombreCuentaAlmacenamiento",
+														"type": "Expression"
+													},
+													"SecretoKeyVConexionDestino": {
+														"value": "@item().SecretoCuentaAlmacenamiento",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "CerrarConExitoMoverFSDL",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "MoverArchivoFSDL",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Exito",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"MensajeUsuario\":\"Movimiento Exitoso\"  }'\n)",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "ValidarBorrarArchivoFSDL",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "ExisteArchivoAMoverFSDL",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [
+								{
+									"name": "ArchivoOrigen",
+									"value": "@item().ArchivoOrigen"
+								},
+								{
+									"name": "DirectorioOrigen",
+									"value": "@item().DirectorioOrigen"
+								},
+								{
+									"name": "ContenedorOrigen",
+									"value": "@item().ContenedorOrigen"
+								},
+								{
+									"name": "BorrarOrigen",
+									"value": "@item().BorrarOrigen"
+								},
+								{
+									"name": "ArchivoExiste",
+									"value": "@activity('ValidarSiArchivoExisteFSDL').output.exists"
+								}
+							],
+							"typeProperties": {
+								"expression": {
+									"value": "@and(activity('ValidarSiArchivoExisteFSDL').output.exists,equals(item().BorrarOrigen,'Si'))",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "BorrarArchivoFSDL",
+										"description": "Si se tiene la opción habilitada de borrar el archivo, se elimina con esta tarea",
+										"type": "Delete",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "ArchivoOrigen",
+												"value": "@item().ArchivoOrigen"
+											},
+											{
+												"name": "BorrarOrigen",
+												"value": "@item().BorrarOrigen"
+											}
+										],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "DS_OrigenArchivoBinarioFS",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": {
+														"value": "@item().ContenedorOrigen",
+														"type": "Expression"
+													},
+													"Directory": {
+														"value": "@item().DirectorioOrigen",
+														"type": "Expression"
+													},
+													"filename": {
+														"value": "@item().ArchivoOrigen",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamiento": {
+														"value": "@item().NombreCuentaAlmacenamientoOrigen",
+														"type": "Expression"
+													},
+													"NombreSecreto": {
+														"value": "@item().SecretoKeyVConexionOrigen",
+														"type": "Expression"
+													}
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureFileStorageReadSettings",
+												"recursive": true
+											}
+										}
+									},
+									{
+										"name": "CerrarConExitoBorrarFSDL",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "BorrarArchivoFSDL",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Exito",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"MensajeUsuario\":\"Borrado Exitoso\"  }'\n)",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "CerrarConFalloMoverFSDL",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "ExisteArchivoAMoverFSDL",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('\"\"MensajeUsuario\":\"'\n        , 'Movimiento Fallido'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('MoverArchivoFSDL').error.Message  \n        ,'\" }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "CerrarConFalloMoverFSDL2",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "ValidarBorrarArchivoFSDL",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('\"MensajeUsuario\":\"'\n        , 'Movimiento Fallido'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('BorrarArchivoFSDL').error.Message  \n        ,'\" }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "IngestaEjecucion MoverArchivosFSDL",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select IdIngestaEjecucion\n\t,SecretoKeyVConexionOrigen\n\t,NombreCuentaAlmacenamientoOrigen\n\t,ContenedorOrigen\n\t,DirectorioOrigen = Eje.SelectEjecutar\n\t,ArchivoOrigen = Eje.ArchivoOrigen\n\t,SecretoCuentaAlmacenamiento\n\t,NombreCuentaAlmacenamiento\n\t,ContenedorDestino\n\t,Eje.DirectorioDestino\n\t,Eje.NombreArchivoDestino\n\t,COALESCE(JSON_VALUE(ConfiguracionAdicional,'$.BorrarOrigen'),'No') as BorrarOrigen\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion in ('MoverArchivoFSDL')\n\tAnd Proyecto = '@{pipeline().parameters.Proyecto}'\n\tAnd Tema = Case When '@{pipeline().parameters.Tema}' ='*' Then Tema Else '@{pipeline().parameters.Tema}' End\n\tAnd  NombreExtraccion = Case When '@{pipeline().parameters.NombreExtraccion}' = '*' Then NombreExtraccion Else '@{pipeline().parameters.NombreExtraccion}' End \n\tAnd Eje.Estado = 'Pendiente'\n",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			}
+		],
+		"parameters": {
+			"Proyecto": {
+				"type": "string",
+				"defaultValue": "MVPFinanzas"
+			},
+			"Tema": {
+				"type": "string",
+				"defaultValue": "*"
+			},
+			"NombreExtraccion": {
+				"type": "string",
+				"defaultValue": "*"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-10-11T16:11:29Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

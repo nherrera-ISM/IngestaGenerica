@@ -1,0 +1,7 @@
+{
+	"name": "PE-AEU-HCL-IOT-DL",
+	"properties": {
+		"privateLinkResourceId": "/subscriptions/072274a1-cef0-449f-a483-15abe163732f/resourceGroups/RG-AEU-HCL-PRD-IIOT/providers/Microsoft.Storage/storageAccounts/dlaeuhclprdiiot",
+		"groupId": "dfs"
+	}
+}

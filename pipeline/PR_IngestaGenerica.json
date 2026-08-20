@@ -1,0 +1,1477 @@
+{
+	"name": "PR_IngestaGenerica",
+	"properties": {
+		"description": "Canalización para realizar la ingesta genérica de diferentes fuentes.",
+		"activities": [
+			{
+				"name": "Ingesta Generar Consultas",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Metadata].[IngestaGenerarConsultas]",
+					"storedProcedureParameters": {
+						"NombreExtraccion": {
+							"value": {
+								"value": "@pipeline().parameters.NombreExtraccion",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PipelineRunId": {
+							"value": {
+								"value": "@pipeline().RunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Proyecto": {
+							"value": {
+								"value": "@pipeline().parameters.Proyecto",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Tema": {
+							"value": {
+								"value": "@pipeline().parameters.Tema",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "LS_SQLMetaData",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "IngestaEjecucion CSV",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Ingesta Generar Consultas",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select IdIngestaEjecucion\n\t,DirectorioDestino\n\t,Eje.NombreArchivoDestino\n\t,ArchivoOrigen = ArchivoOrigen\n\t,DirectorioOrigen = SelectEjecutar\n\t,ContenedorDestino\n\t,NombreCuentaAlmacenamiento\n\t,SecretoCuentaAlmacenamiento\n\t,NombreCuentaAlmacenamientoOrigen\n\t,ContenedorOrigen\n\t,SecretoKeyVConexionOrigen\n\t,COALESCE(JSON_VALUE(ConfiguracionAdicional,'$.DelimitadorColumna'),';') as DelimitadorColumna\n\t,COALESCE([PrimerRegistroEncabezado],1) as PrimerRegistroEncabezado\n\t,COALESCE([OmitirFilas],0) as OmitirFilas\n\t,[MapeoCampos]\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion in ('CSV', 'CSVParticionFecha')\n\tAnd Proyecto = '@{pipeline().parameters.Proyecto}'\n\tAnd Tema = Case When '@{pipeline().parameters.Tema}' ='*' Then Tema Else '@{pipeline().parameters.Tema}' End\n\tAnd  NombreExtraccion = Case When '@{pipeline().parameters.NombreExtraccion}' = '*' Then NombreExtraccion Else '@{pipeline().parameters.NombreExtraccion}' End \n\tAnd Eje.Estado = 'Pendiente'\n",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Para Cada Archivo CSV",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "IngestaEjecucion CSV",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('IngestaEjecucion CSV').output.value",
+						"type": "Expression"
+					},
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "ValidarSiArchivoCSVExiste",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "DS_OrigenCSV",
+									"type": "DatasetReference",
+									"parameters": {
+										"DirectorioRaiz": {
+											"value": "@item().DirectorioOrigen",
+											"type": "Expression"
+										},
+										"Archivo": {
+											"value": "@item().ArchivoOrigen",
+											"type": "Expression"
+										},
+										"NombreCuentaAlmacenamiento": {
+											"value": "@item().NombreCuentaAlmacenamientoOrigen",
+											"type": "Expression"
+										},
+										"NombreContenedorFile": {
+											"value": "@item().ContenedorOrigen",
+											"type": "Expression"
+										},
+										"NombreSecreto": {
+											"value": "@item().SecretoKeyVConexionOrigen",
+											"type": "Expression"
+										},
+										"DelimitadorColumna": {
+											"value": "@item().DelimitadorColumna",
+											"type": "Expression"
+										},
+										"PrimerRegistroEncabezado": {
+											"value": "@item().PrimerRegistroEncabezado",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"exists"
+								],
+								"storeSettings": {
+									"type": "AzureFileStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							}
+						},
+						{
+							"name": "ExisteArchivoCSV",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "ValidarSiArchivoCSVExiste",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@activity('ValidarSiArchivoCSVExiste').output.exists",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "CerrarConFalloCSV_ArchivoNoEncontrado",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.00:12:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Error",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"MensajeUsuario\":\"El archivo CSV no existe en el origen\"}')",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Copiar Datos CSV",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.00:10:00",
+											"retry": 1,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "DirectorioOrigen",
+												"value": "@item().DirectorioOrigen"
+											},
+											{
+												"name": "ArchivoOrigen",
+												"value": "@item().ArchivoOrigen"
+											}
+										],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureFileStorageReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings",
+													"skipLineCount": {
+														"value": "@item().OmitirFilas",
+														"type": "Expression"
+													}
+												}
+											},
+											"sink": {
+												"type": "ParquetSink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												},
+												"formatSettings": {
+													"type": "ParquetWriteSettings"
+												}
+											},
+											"enableStaging": false,
+											"translator": {
+												"value": "@if(equals(item().MapeoCampos,null),null,json(item().MapeoCampos))",
+												"type": "Expression"
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "DS_OrigenCSV",
+												"type": "DatasetReference",
+												"parameters": {
+													"DirectorioRaiz": {
+														"value": "@item().DirectorioOrigen",
+														"type": "Expression"
+													},
+													"Archivo": {
+														"value": "@item().ArchivoOrigen",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamiento": {
+														"value": "@item().NombreCuentaAlmacenamientoOrigen",
+														"type": "Expression"
+													},
+													"NombreContenedorFile": {
+														"value": "@item().ContenedorOrigen",
+														"type": "Expression"
+													},
+													"NombreSecreto": {
+														"value": "@item().SecretoKeyVConexionOrigen",
+														"type": "Expression"
+													},
+													"DelimitadorColumna": {
+														"value": "@item().DelimitadorColumna",
+														"type": "Expression"
+													},
+													"PrimerRegistroEncabezado": {
+														"value": "@item().PrimerRegistroEncabezado",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "DS_DestinoParquet",
+												"type": "DatasetReference",
+												"parameters": {
+													"DirectorioRaizDataLake": {
+														"value": "@item().DirectorioDestino",
+														"type": "Expression"
+													},
+													"NombreArchivo": {
+														"value": "@item().NombreArchivoDestino",
+														"type": "Expression"
+													},
+													"ContenedorDataLake": {
+														"value": "@item().ContenedorDestino",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamiento": {
+														"value": "@item().NombreCuentaAlmacenamiento",
+														"type": "Expression"
+													},
+													"NombreSecretoCtaAlmacenamiento": {
+														"value": "@item().SecretoCuentaAlmacenamiento",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "CerrarConExitoCSV",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Copiar Datos CSV",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Exito",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"DuracionSeg\":\"'\n        , activity('Copiar Datos CSV').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , activity('Copiar Datos CSV').output.rowsCopied\n        , '\" ,\"MensajeUsuario\":\"Carga Exitosa\"  }'\n)",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "CerrarConFalloCSV",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Copiar Datos CSV",
+												"dependencyConditions": [
+													"Failed"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Error",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"DuracionSeg\":\"'\n        , activity('Copiar Datos CSV').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , ''\n        , '\", \"MensajeUsuario\":\"'\n        , 'Carga Fallida'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('Copiar Datos CSV').error.Message  \n        ,'\" }'\n)\n",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Ingesta SelectParticionFecha",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Ingesta Generar Consultas",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "Select IdIngestaEjecucion\n\t,DirectorioDestino\n\t,Eje.NombreArchivoDestino\n\t,TablaOrigen = TablaOrigen_Archivo\n\t,EsquemaOrigen = EsquemaOrigen_DirectorioRaiz\n\t,SelectEjecutar\n\t,ContenedorDestino\n\t,NombreCuentaAlmacenamiento\n\t,SecretoCuentaAlmacenamiento\n\t,SecretoKeyVConexionOrigen\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion in('SelectSimple','SelectParticionFecha')\n\tAnd Eje.Estado = 'Pendiente'",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Para cada select",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Ingesta SelectParticionFecha",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Ingesta SelectParticionFecha').output.value",
+						"type": "Expression"
+					},
+					"batchCount": 20,
+					"activities": [
+						{
+							"name": "EjecutarCadaConsulta",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:30:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "SelectEjecutar",
+									"value": "@item().SelectEjecutar"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "@item().SelectEjecutar",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"dataIntegrationUnits": 4,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_OrigenSQLServer",
+									"type": "DatasetReference",
+									"parameters": {
+										"Tabla": {
+											"value": "@item().TablaOrigen",
+											"type": "Expression"
+										},
+										"Esquema": {
+											"value": "@item().EsquemaOrigen",
+											"type": "Expression"
+										},
+										"SecretoBD": {
+											"value": "@item().SecretoKeyVConexionOrigen",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_DestinoParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"DirectorioRaizDataLake": {
+											"value": "@item().DirectorioDestino",
+											"type": "Expression"
+										},
+										"NombreArchivo": {
+											"value": "@item().NombreArchivoDestino",
+											"type": "Expression"
+										},
+										"ContenedorDataLake": {
+											"value": "@item().ContenedorDestino",
+											"type": "Expression"
+										},
+										"NombreCuentaAlmacenamiento": {
+											"value": "@item().NombreCuentaAlmacenamiento",
+											"type": "Expression"
+										},
+										"NombreSecretoCtaAlmacenamiento": {
+											"value": "@item().SecretoCuentaAlmacenamiento",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "CerrarConExito_Select",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "EjecutarCadaConsulta",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Exito",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('{\"DuracionSeg\":\"'\n        , activity('EjecutarCadaConsulta').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , activity('EjecutarCadaConsulta').output.rowsCopied\n        , '\" ,\"MensajeUsuario\":\"Carga Exitosa\"  }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "CerrarConFallo_Select",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "EjecutarCadaConsulta",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('{\"DuracionSeg\":\"'\n        , activity('EjecutarCadaConsulta').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , ''\n        , '\", \"MensajeUsuario\":\"'\n        , 'Carga Fallida'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('EjecutarCadaConsulta').error.Message  \n        ,'\" }'\n)\n",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Ingesta TablaCompleta",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Ingesta Generar Consultas",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select IdIngestaEjecucion\n\t,DirectorioDestino\n\t,Eje.NombreArchivoDestino\n\t,TablaOrigen = TablaOrigen_Archivo\n\t,EsquemaOrigen = EsquemaOrigen_DirectorioRaiz\n\t,ContenedorDestino\n\t,NombreCuentaAlmacenamiento\n\t,SecretoCuentaAlmacenamiento\n\t,SecretoKeyVConexionOrigen\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion = 'TablaCompleta'\n\tAnd Proyecto = '@{pipeline().parameters.Proyecto}'\n\tAnd Tema = Case When '@{pipeline().parameters.Tema}' ='*' Then Tema Else '@{pipeline().parameters.Tema}' End\n\tAnd  NombreExtraccion = Case When '@{pipeline().parameters.NombreExtraccion}' = '*' Then NombreExtraccion Else '@{pipeline().parameters.NombreExtraccion}' End \n\tAnd Eje.Estado = 'Pendiente'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Para cada Tabla",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Ingesta TablaCompleta",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Ingesta TablaCompleta').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Leer cada tabla",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "EsquemaOrigen",
+									"value": "@item().EsquemaOrigen"
+								},
+								{
+									"name": "TablaOrigen",
+									"value": "@item().TablaOrigen"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_OrigenSQLServer",
+									"type": "DatasetReference",
+									"parameters": {
+										"Tabla": {
+											"value": "@item().TablaOrigen",
+											"type": "Expression"
+										},
+										"Esquema": {
+											"value": "@item().EsquemaOrigen",
+											"type": "Expression"
+										},
+										"SecretoBD": {
+											"value": "@item().SecretoKeyVConexionOrigen",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_DestinoParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"DirectorioRaizDataLake": {
+											"value": "@item().DirectorioDestino",
+											"type": "Expression"
+										},
+										"NombreArchivo": {
+											"value": "@item().NombreArchivoDestino",
+											"type": "Expression"
+										},
+										"ContenedorDataLake": {
+											"value": "@item().ContenedorDestino",
+											"type": "Expression"
+										},
+										"NombreCuentaAlmacenamiento": {
+											"value": "@item().NombreCuentaAlmacenamiento",
+											"type": "Expression"
+										},
+										"NombreSecretoCtaAlmacenamiento": {
+											"value": "@item().SecretoCuentaAlmacenamiento",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "CerrarConExito_TablaCompleta",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Leer cada tabla",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Exito",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('{\"DuracionSeg\":\"'\n        , activity('Leer cada tabla').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , activity('Leer cada tabla').output.rowsCopied\n        , '\", \"MensajeUsuario\":\"Carga Exitosa\"  }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "CerrarConFallo_TablaCompleta",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Leer cada tabla",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('{\"DuracionSeg\":\"'\n        , activity('Leer cada tabla').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , ''\n        , '\", \"MensajeUsuario\":\"'\n        , 'Carga Fallida'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('Leer cada tabla').error.Message  \n        ,'\" }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "IngestaEjecucion HojaExcel",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Ingesta Generar Consultas",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select IdIngestaEjecucion\n\t,DirectorioDestino\n\t,Eje.NombreArchivoDestino\n\t,ArchivoOrigen = ArchivoOrigen\n\t,DirectorioOrigen = SelectEjecutar\n\t,ContenedorDestino\n\t,NombreCuentaAlmacenamiento\n\t,SecretoCuentaAlmacenamiento\n\t,Hoja = HojaExcel\n\t,Rango = RangoExcel\n\t,NombreCuentaAlmacenamientoOrigen\n\t,ContenedorOrigen\n\t,SecretoKeyVConexionOrigen\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion in ('HojaExcel')\n\tAnd Proyecto = '@{pipeline().parameters.Proyecto}'\n\tAnd Tema = Case When '@{pipeline().parameters.Tema}' ='*' Then Tema Else '@{pipeline().parameters.Tema}' End\n\tAnd  NombreExtraccion = Case When '@{pipeline().parameters.NombreExtraccion}' = '*' Then NombreExtraccion Else '@{pipeline().parameters.NombreExtraccion}' End \n\tAnd Eje.Estado = 'Pendiente'\n",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Para Cada Archivo Excel",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "IngestaEjecucion HojaExcel",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('IngestaEjecucion HojaExcel').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "ValidarSiArchivoExcelExiste",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "DS_OrigenExcel",
+									"type": "DatasetReference",
+									"parameters": {
+										"DirectorioRaiz": {
+											"value": "@item().DirectorioOrigen",
+											"type": "Expression"
+										},
+										"Archivo": {
+											"value": "@item().ArchivoOrigen",
+											"type": "Expression"
+										},
+										"Hoja": {
+											"value": "@item().Hoja",
+											"type": "Expression"
+										},
+										"Rango": {
+											"value": "@item().Rango",
+											"type": "Expression"
+										},
+										"NombreCuentaAlmacenamiento": {
+											"value": "@item().NombreCuentaAlmacenamientoOrigen",
+											"type": "Expression"
+										},
+										"NombreContenedorFile": {
+											"value": "@item().ContenedorOrigen",
+											"type": "Expression"
+										},
+										"NombreSecreto": {
+											"value": "@item().SecretoKeyVConexionOrigen",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"exists"
+								],
+								"storeSettings": {
+									"type": "AzureFileStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							}
+						},
+						{
+							"name": "ExisteArchivoExcel",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "ValidarSiArchivoExcelExiste",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@activity('ValidarSiArchivoExcelExiste').output.exists",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "CerrarConFalloExcel_ArchivoNoEncontrado",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.00:12:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Error",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"MensajeUsuario\":\"El archivo o la hoja de Excel no existe en el origen\"}')",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Copiar Datos HojaExcel",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 1,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [
+											{
+												"name": "DirectorioOrigen",
+												"value": "@item().DirectorioOrigen"
+											},
+											{
+												"name": "ArchivoOrigen",
+												"value": "@item().ArchivoOrigen"
+											}
+										],
+										"typeProperties": {
+											"source": {
+												"type": "ExcelSource",
+												"storeSettings": {
+													"type": "AzureFileStorageReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												}
+											},
+											"sink": {
+												"type": "ParquetSink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												},
+												"formatSettings": {
+													"type": "ParquetWriteSettings"
+												}
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "DS_OrigenExcel",
+												"type": "DatasetReference",
+												"parameters": {
+													"DirectorioRaiz": {
+														"value": "@item().DirectorioOrigen",
+														"type": "Expression"
+													},
+													"Archivo": {
+														"value": "@item().ArchivoOrigen",
+														"type": "Expression"
+													},
+													"Hoja": {
+														"value": "@item().Hoja",
+														"type": "Expression"
+													},
+													"Rango": {
+														"value": "@item().Rango",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamiento": {
+														"value": "@item().NombreCuentaAlmacenamientoOrigen",
+														"type": "Expression"
+													},
+													"NombreContenedorFile": {
+														"value": "@item().ContenedorOrigen",
+														"type": "Expression"
+													},
+													"NombreSecreto": {
+														"value": "@item().SecretoKeyVConexionOrigen",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "DS_DestinoParquet",
+												"type": "DatasetReference",
+												"parameters": {
+													"DirectorioRaizDataLake": {
+														"value": "@item().DirectorioDestino",
+														"type": "Expression"
+													},
+													"NombreArchivo": {
+														"value": "@item().NombreArchivoDestino",
+														"type": "Expression"
+													},
+													"ContenedorDataLake": {
+														"value": "@item().ContenedorDestino",
+														"type": "Expression"
+													},
+													"NombreCuentaAlmacenamiento": {
+														"value": "@item().NombreCuentaAlmacenamiento",
+														"type": "Expression"
+													},
+													"NombreSecretoCtaAlmacenamiento": {
+														"value": "@item().SecretoCuentaAlmacenamiento",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "CerrarConExitoHojaExcel",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Copiar Datos HojaExcel",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Exito",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"DuracionSeg\":\"'\n        , activity('Copiar Datos HojaExcel').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , activity('Copiar Datos HojaExcel').output.rowsCopied\n        , '\" ,\"MensajeUsuario\":\"Carga Exitosa\"  }'\n)",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "CerrarConFalloHojaExcel",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Copiar Datos HojaExcel",
+												"dependencyConditions": [
+													"Failed"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+											"storedProcedureParameters": {
+												"Estado": {
+													"value": "Error",
+													"type": "String"
+												},
+												"IdIngestaEjecucion": {
+													"value": {
+														"value": "@item().IdIngestaEjecucion",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"Mensaje": {
+													"value": {
+														"value": "@Concat('{\"DuracionSeg\":\"'\n        , activity('Copiar Datos HojaExcel').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , ''\n        , '\", \"MensajeUsuario\":\"'\n        , 'Carga Fallida'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('Copiar Datos HojaExcel').error.Message  \n        ,'\" }'\n)",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "LS_SQLMetaData",
+											"type": "LinkedServiceReference"
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "ActualizarConfiguracion",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Para Cada Archivo CSV",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Para cada select",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Para cada Tabla",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Para Cada Archivo Excel",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "PR_Mover_Archivo",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Metadata].[IngestaActualizarConfiguracion]",
+					"storedProcedureParameters": {
+						"PipelineRunId": {
+							"value": {
+								"value": "@pipeline().RunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "LS_SQLMetaData",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "IngestaEjecucion MoverArchivos",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Ingesta Generar Consultas",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select IdIngestaEjecucion\n\t,SecretoKeyVConexionOrigen\n\t,NombreCuentaAlmacenamientoOrigen\n\t,ContenedorOrigen\n\t,DirectorioOrigen = Eje.SelectEjecutar\n\t,ArchivoOrigen = Eje.ArchivoOrigen\n\t,SecretoCuentaAlmacenamiento\n\t,NombreCuentaAlmacenamiento\n\t,ContenedorDestino\n\t,Eje.DirectorioDestino\n\t,Eje.NombreArchivoDestino\n\t,COALESCE(JSON_VALUE(ConfiguracionAdicional,'$.BorrarOrigen'),'No') as BorrarOrigen\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion in ('MoverArchivo','MoverArchivoFS','MoverArchivoFSDL')\n\tAnd Proyecto = '@{pipeline().parameters.Proyecto}'\n\tAnd Tema = Case When '@{pipeline().parameters.Tema}' ='*' Then Tema Else '@{pipeline().parameters.Tema}' End\n\tAnd  NombreExtraccion = Case When '@{pipeline().parameters.NombreExtraccion}' = '*' Then NombreExtraccion Else '@{pipeline().parameters.NombreExtraccion}' End \n\tAnd Eje.Estado = 'Pendiente'\n",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "PR_Mover_Archivo",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "IngestaEjecucion MoverArchivos",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PR_Mover_Archivo",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"Proyecto": {
+							"value": "@pipeline().parameters.Proyecto",
+							"type": "Expression"
+						},
+						"Tema": {
+							"value": "@pipeline().parameters.Tema",
+							"type": "Expression"
+						},
+						"NombreExtraccion": {
+							"value": "@pipeline().parameters.NombreExtraccion",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Proyecto": {
+				"type": "string",
+				"defaultValue": "MVPFinanzas"
+			},
+			"Tema": {
+				"type": "string",
+				"defaultValue": "*"
+			},
+			"NombreExtraccion": {
+				"type": "string",
+				"defaultValue": "*"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-10-11T16:11:29Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

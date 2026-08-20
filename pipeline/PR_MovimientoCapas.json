@@ -1,0 +1,593 @@
+{
+	"name": "PR_MovimientoCapas",
+	"properties": {
+		"activities": [
+			{
+				"name": "CargarConfiguracionAtributos",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Obtener credenciales conexion y metadata MFD",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ParquetSource",
+						"additionalColumns": [
+							{
+								"name": "Estado",
+								"value": "Activo"
+							},
+							{
+								"name": "FechaCreacion",
+								"value": {
+									"value": "@utcnow()",
+									"type": "Expression"
+								}
+							},
+							{
+								"name": "FechaUltimaActualizacion",
+								"value": {
+									"value": "@utcnow()",
+									"type": "Expression"
+								}
+							}
+						],
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "ParquetReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": {
+							"value": "DELETE FROM Metadata.IngestaSilverConfiguracionAtributo\nWHERE Proyecto = '@{pipeline().parameters.Proyecto}'",
+							"type": "Expression"
+						},
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "Proyecto",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "Proyecto",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Tema",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "Tema",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Nombre_Objeto_de_Extraccion",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "NombreIngesta",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Directorio_Bronce",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "DirectorioOrigen",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Paso_a_Silver"
+								},
+								"sink": {
+									"name": "RequeridoSilver"
+								}
+							},
+							{
+								"source": {
+									"name": "Directorio_Silver",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "DirectorioDestino",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Nombre_Columna_Origen",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "NombreAtributoOrigen",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Nombre_Columna_Silver",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "NombreAtributoDestino",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Descripcion_Columna_Negocio",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "DescripcionAtributo",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Estado",
+									"type": "String"
+								},
+								"sink": {
+									"name": "Estado",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "FechaCreacion",
+									"type": "String"
+								},
+								"sink": {
+									"name": "FechaCreacion",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								}
+							},
+							{
+								"source": {
+									"name": "FechaUltimaActualizacion",
+									"type": "String"
+								},
+								"sink": {
+									"name": "FechaUltimaActualizacion",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_OrigenParquet",
+						"type": "DatasetReference",
+						"parameters": {
+							"DirectorioRaizDataLake": {
+								"value": "@{activity('Obtener credenciales conexion y metadata MFD').output.firstRow.DirectorioDestino_Ontologia}",
+								"type": "Expression"
+							},
+							"NombreArchivo": {
+								"value": "@{activity('Obtener credenciales conexion y metadata MFD').output.firstRow.NombreArchivoDestino}",
+								"type": "Expression"
+							},
+							"ContenedorDataLake": "landing",
+							"NombreCuentaAlmacenamiento": {
+								"value": "@{activity('Obtener credenciales conexion y metadata MFD').output.firstRow.NombreCuentaAlmacenamientoDataLake}",
+								"type": "Expression"
+							},
+							"NombreSecretoCtaAlmacenamiento": {
+								"value": "@{activity('Obtener credenciales conexion y metadata MFD').output.firstRow.NombreSecretoCtaDataLake}",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_DestinoSQLMetaDatos",
+						"type": "DatasetReference",
+						"parameters": {
+							"Esquema": "Metadata",
+							"Tabla": "IngestaSilverConfiguracionAtributo"
+						}
+					}
+				]
+			},
+			{
+				"name": "Obtener credenciales conexion y metadata MFD",
+				"description": "Validar hoja extracciones y nombre de hoja BronzeSilver\n\nEste look up retorna \nNombreSecretoCtaDataLake\nNombreCuentaAlmacenamientoDataLake\nDirectorioDestino_Ontologia\nNombreArchivoDestino",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "WITH ParametrosPivotados AS (\n    SELECT *\n    FROM (\n        SELECT CodigoParametro, Valor \n        FROM Metadata.Parametros\n        WHERE Proyecto = 'Transversal'\n    ) AS SourceTable\n    PIVOT (\n        MAX(Valor) \n        FOR CodigoParametro IN ([NombreSecretoCtaDataLake], [NombreCuentaAlmacenamientoDataLake])\n    ) AS PivotTable\n)\n\nSELECT PP.NombreSecretoCtaDataLake, PP.NombreCuentaAlmacenamientoDataLake,\n       IC.DirectorioDestino_Ontologia, concat(IC.NombreArchivoDestino,'.parquet') AS NombreArchivoDestino\nFROM ParametrosPivotados PP\nJOIN [Metadata].[IngestaConfiguracion] IC\nON 1=1  -- Esto garantiza que todas las filas de una tabla se unan con todas las filas de la otra\nWHERE IC.Proyecto = '@{pipeline().parameters.Proyecto}' AND IC.Tema = 'MovimientoCapas' AND IC.NombreExtraccion = 'BronzeSilver';",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					}
+				}
+			},
+			{
+				"name": "Ingesta en silver cada fuente",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Preparar Cada Ingesta Silver",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Preparar Cada Ingesta Silver').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Mover fuente a silver",
+							"type": "DatabricksNotebook",
+							"dependsOn": [
+								{
+									"activity": "Generar consulta",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"notebookPath": "/Repos/julian.malagon@hcl.com.co/DataBricks_ofm/Configuracion/MovimientoCapas",
+								"baseParameters": {
+									"DirectorioOrigen": {
+										"value": "@activity('Generar consulta').output.firstRow.DirectorioOrigen",
+										"type": "Expression"
+									},
+									"DirectorioDestino": {
+										"value": "@activity('Generar consulta').output.firstRow.DirectorioDestino",
+										"type": "Expression"
+									},
+									"Json": {
+										"value": "@activity('Generar consulta').output.firstRow.Json",
+										"type": "Expression"
+									},
+									"PipelineRunId": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									},
+									"NombreDataFactory": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"Info": {
+										"value": "@concat('Ejecución del componente movimiento del proyecto ',item().Proyecto,', con el tema ',item().Tema,' y nombre de ingesta: ',item().NombreIngesta)\n",
+										"type": "Expression"
+									},
+									"Proyecto": {
+										"value": "@item().Proyecto",
+										"type": "Expression"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_Databricks",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Generar consulta",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[Metadata].[IngestaSilverGenerarConsulta]",
+									"storedProcedureParameters": {
+										"NombreIngesta": {
+											"type": "String",
+											"value": {
+												"value": "@item().NombreIngesta",
+												"type": "Expression"
+											}
+										},
+										"PipelineRunId": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											}
+										},
+										"Proyecto": {
+											"type": "String",
+											"value": {
+												"value": "@item().Proyecto",
+												"type": "Expression"
+											}
+										},
+										"Tema": {
+											"type": "String",
+											"value": {
+												"value": "@item().Tema",
+												"type": "Expression"
+											}
+										},
+										"DirectorioDestino": {
+											"type": "String",
+											"value": {
+												"value": "@item().DirectorioDestino",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "DS_OrigenSQLMetaDatos",
+									"type": "DatasetReference"
+								}
+							}
+						},
+						{
+							"name": "Cerrar con Exito",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Mover fuente a silver",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaSilverCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Exito",
+										"type": "String"
+									},
+									"Mensaje": {
+										"value": "Carga exitosa",
+										"type": "String"
+									},
+									"PipelineRunId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DirectorioOrigen": {
+										"value": {
+											"value": "@activity('Generar consulta').output.firstRow.DirectorioOrigen",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DirectorioDestino": {
+										"value": {
+											"value": "@activity('Generar consulta').output.firstRow.DirectorioDestino",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Cerrar con Error",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Mover fuente a silver",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaSilverCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"Mensaje": {
+										"value": "Carga fallida",
+										"type": "String"
+									},
+									"PipelineRunId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DirectorioOrigen": {
+										"value": {
+											"value": "@activity('Generar consulta').output.firstRow.DirectorioOrigen",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DirectorioDestino": {
+										"value": {
+											"value": "@activity('Generar consulta').output.firstRow.DirectorioDestino",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Preparar Cada Ingesta Silver",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "CargarConfiguracionAtributos",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "  SELECT DISTINCT Proyecto, Tema, NombreIngesta, DirectorioDestino FROM [Metadata].[IngestaSilverConfiguracionAtributo]\n    WHERE Proyecto =  '@{pipeline().parameters.Proyecto}' \n  and Tema = CASE WHEN  '@{pipeline().parameters.Tema}' = '*' THEN Tema ELSE '@{pipeline().parameters.Tema}' END \n  and NombreIngesta = CASE WHEN  '@{pipeline().parameters.NombreIngesta}' = '*' THEN NombreIngesta ELSE '@{pipeline().parameters.NombreIngesta}' END \n  and Tema <> 'MovimientoCapas'\n  and RequeridoSilver = 'Si'\n",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			}
+		],
+		"parameters": {
+			"Proyecto": {
+				"type": "string",
+				"defaultValue": "OFM"
+			},
+			"Tema": {
+				"type": "string",
+				"defaultValue": "*"
+			},
+			"NombreIngesta": {
+				"type": "string",
+				"defaultValue": "*"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": []
+	}
+}

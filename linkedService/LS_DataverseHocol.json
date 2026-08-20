@@ -1,0 +1,40 @@
+{
+	"name": "LS_DataverseHocol",
+	"properties": {
+		"description": "Conexión al Dataver de Hocol. Se deja fijo el nombre del secreto porque a la fecha, este servicio no acepta Parámetros",
+		"parameters": {
+			"ServiceUri": {
+				"type": "string",
+				"defaultValue": "https://hocoldev.crm.dynamics.com"
+			},
+			"SecretName": {
+				"type": "string",
+				"defaultValue": "dataversedevdatadriven01"
+			}
+		},
+		"annotations": [],
+		"type": "CommonDataServiceForApps",
+		"typeProperties": {
+			"deploymentType": "Online",
+			"serviceUri": "@{linkedService().ServiceUri}",
+			"authenticationType": "AADServicePrincipal",
+			"servicePrincipalId": "1b5c53b8-b331-4bca-9bd0-19eee162505c",
+			"servicePrincipalCredential": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "LS_KeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@linkedService().SecretName",
+					"type": "Expression"
+				}
+			},
+			"servicePrincipalCredentialType": "ServicePrincipalKey"
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

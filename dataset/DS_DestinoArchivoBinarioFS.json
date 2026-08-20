@@ -1,0 +1,58 @@
+{
+	"name": "DS_DestinoArchivoBinarioFS",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_AZFile",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"NombreCuentaAlmacenamiento": {
+					"value": "@dataset().NombreCuentaAlmacenamientoDestino",
+					"type": "Expression"
+				},
+				"NombreContenedorFile": {
+					"value": "@dataset().Container",
+					"type": "Expression"
+				},
+				"NombreSecreto": {
+					"value": "@dataset().NombreSecreto",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"Container": {
+				"type": "string"
+			},
+			"Directory": {
+				"type": "string"
+			},
+			"filename": {
+				"type": "string"
+			},
+			"NombreCuentaAlmacenamientoDestino": {
+				"type": "string"
+			},
+			"NombreSecreto": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "AzureFileStorageLocation",
+				"fileName": {
+					"value": "@dataset().filename",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().Directory",
+					"type": "Expression"
+				}
+			}
+		}
+	}
+}

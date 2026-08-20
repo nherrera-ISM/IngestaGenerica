@@ -1,0 +1,358 @@
+{
+	"name": "PR_IngestaGenericaDataverse",
+	"properties": {
+		"description": "Canalización para realizar la ingesta genérica solo para Dataverse",
+		"activities": [
+			{
+				"name": "Ingesta Generar Consultas",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Metadata].[IngestaGenerarConsultas]",
+					"storedProcedureParameters": {
+						"NombreExtraccion": {
+							"value": {
+								"value": "@pipeline().parameters.NombreExtraccion",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PipelineRunId": {
+							"value": {
+								"value": "@pipeline().RunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Proyecto": {
+							"value": {
+								"value": "@pipeline().parameters.Proyecto",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Tema": {
+							"value": {
+								"value": "@pipeline().parameters.Tema",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "LS_SQLMetaData",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "ActualizarConfiguracion",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Para cada Entidad Dataverse",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Metadata].[IngestaActualizarConfiguracion]",
+					"storedProcedureParameters": {
+						"PipelineRunId": {
+							"value": {
+								"value": "@pipeline().RunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "LS_SQLMetaData",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Ingesta Dataverse",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Ingesta Generar Consultas",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select IdIngestaEjecucion\n\t,DirectorioDestino\n\t,Eje.NombreArchivoDestino\n\t,TablaOrigen = TablaOrigen_Archivo\n\t,EsquemaOrigen = EsquemaOrigen_DirectorioRaiz\n\t,ContenedorDestino\n\t,NombreCuentaAlmacenamiento\n\t,SecretoCuentaAlmacenamiento\n\t,SecretoKeyVConexionOrigen\n\t,SelectOrigen\n\t,MapeoCampos\n\t,ConfiguracionAdicional\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion = 'Dataverse'\n\tAnd Proyecto = '@{pipeline().parameters.Proyecto}'\n\tAnd Tema = Case When '@{pipeline().parameters.Tema}' ='*' Then Tema Else '@{pipeline().parameters.Tema}' End\n\tAnd  NombreExtraccion = Case When '@{pipeline().parameters.NombreExtraccion}' = '*' Then NombreExtraccion Else '@{pipeline().parameters.NombreExtraccion}' End \n\tAnd Eje.Estado = 'Pendiente'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Para cada Entidad Dataverse",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Ingesta Dataverse",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Ingesta Dataverse').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Leer cada entidad dataverse",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "EsquemaOrigen",
+									"value": "@item().EsquemaOrigen"
+								},
+								{
+									"name": "TablaOrigen",
+									"value": "@item().TablaOrigen"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "CommonDataServiceForAppsSource",
+									"query": {
+										"value": "@item().SelectOrigen",
+										"type": "Expression"
+									}
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"value": "@item().MapeoCampos",
+									"type": "Expression"
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_OrigenDataverse",
+									"type": "DatasetReference",
+									"parameters": {
+										"Entidad": {
+											"value": "@item().TablaOrigen",
+											"type": "Expression"
+										},
+										"ServiceUri": {
+											"value": "@item().ConfiguracionAdicional",
+											"type": "Expression"
+										},
+										"SecretName": {
+											"value": "@item().SecretoKeyVConexionOrigen",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_DestinoParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"DirectorioRaizDataLake": {
+											"value": "@item().DirectorioDestino",
+											"type": "Expression"
+										},
+										"NombreArchivo": {
+											"value": "@item().NombreArchivoDestino",
+											"type": "Expression"
+										},
+										"ContenedorDataLake": {
+											"value": "@item().ContenedorDestino",
+											"type": "Expression"
+										},
+										"NombreCuentaAlmacenamiento": {
+											"value": "@item().NombreCuentaAlmacenamiento",
+											"type": "Expression"
+										},
+										"NombreSecretoCtaAlmacenamiento": {
+											"value": "@item().SecretoCuentaAlmacenamiento",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "CerrarConExito_EntidadDataverse",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Leer cada entidad dataverse",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Exito",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('{\"DuracionSeg\":\"'\n        , activity('Leer cada entidad dataverse').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , activity('Leer cada entidad dataverse').output.rowsCopied\n        , '\", \"MensajeUsuario\":\"Carga Exitosa\"  }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "CerrarConFallo_EntidadDataverse",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Leer cada entidad dataverse",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('{\"DuracionSeg\":\"'\n        , activity('Leer cada entidad dataverse').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , ''\n        , '\", \"MensajeUsuario\":\"'\n        , 'Carga Fallida'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('Leer cada entidad dataverse').error.Message  \n        ,'\" }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"Proyecto": {
+				"type": "string",
+				"defaultValue": "Datamart Proyectos"
+			},
+			"Tema": {
+				"type": "string",
+				"defaultValue": "Caracterizacion_Proyectos"
+			},
+			"NombreExtraccion": {
+				"type": "string",
+				"defaultValue": "*"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-10-11T16:11:29Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

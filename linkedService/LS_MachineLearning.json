@@ -1,0 +1,17 @@
+{
+	"name": "LS_MachineLearning",
+	"properties": {
+		"annotations": [],
+		"type": "AzureMLService",
+		"typeProperties": {
+			"subscriptionId": "a9ba1a46-07ac-44d4-86a0-f42199471861",
+			"resourceGroupName": "rg-aeu-hcl-dev-datadriven",
+			"mlWorkspaceName": "ML-AEU-HCL-DEV-DDRIVEN01",
+			"authentication": "MSI"
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

@@ -1,0 +1,69 @@
+{
+	"name": "DS_OrigenSapTabla",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_SAP_TABLE",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"NombreServidorSap": {
+					"value": "@dataset().NombreServidorSap",
+					"type": "Expression"
+				},
+				"NumeroSistema": {
+					"value": "@dataset().NumeroSistema",
+					"type": "Expression"
+				},
+				"Mandante": {
+					"value": "@dataset().Mandante",
+					"type": "Expression"
+				},
+				"NombreUsuario": {
+					"value": "@dataset().NombreUsuario",
+					"type": "Expression"
+				},
+				"SecreroUsuario": {
+					"value": "@dataset().SecreroUsuario",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"NombreServidorSap": {
+				"type": "string",
+				"defaultValue": "hclerpdes.hocol.com.co"
+			},
+			"NumeroSistema": {
+				"type": "string",
+				"defaultValue": "00"
+			},
+			"Mandante": {
+				"type": "string",
+				"defaultValue": "300"
+			},
+			"NombreUsuario": {
+				"type": "string",
+				"defaultValue": "C0806956"
+			},
+			"NombreTabla": {
+				"type": "string",
+				"defaultValue": "T8JVT"
+			},
+			"SecreroUsuario": {
+				"type": "string",
+				"defaultValue": "spdevdatadrivenpw"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenericaSap"
+		},
+		"annotations": [],
+		"type": "SapTableResource",
+		"schema": [],
+		"typeProperties": {
+			"tableName": {
+				"value": "@dataset().NombreTabla",
+				"type": "Expression"
+			}
+		}
+	}
+}

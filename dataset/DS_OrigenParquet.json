@@ -1,0 +1,65 @@
+{
+	"name": "DS_OrigenParquet",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_DataLake",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"NombreSecreto": {
+					"value": "@dataset().NombreSecretoCtaAlmacenamiento",
+					"type": "Expression"
+				},
+				"NombreCuentaAlmacenamiento": {
+					"value": "@dataset().NombreCuentaAlmacenamiento",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"DirectorioRaizDataLake": {
+				"type": "string",
+				"defaultValue": "transitorio/desarrollo_produccion/operaciones_produccion/maestro/"
+			},
+			"NombreArchivo": {
+				"type": "string"
+			},
+			"ContenedorDataLake": {
+				"type": "string",
+				"defaultValue": "silver"
+			},
+			"NombreCuentaAlmacenamiento": {
+				"type": "string",
+				"defaultValue": "dlaeuhcldevdatadriven"
+			},
+			"NombreSecretoCtaAlmacenamiento": {
+				"type": "string",
+				"defaultValue": "dlaeuhcldevdatadrivenkey"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().NombreArchivo",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().DirectorioRaizDataLake",
+					"type": "Expression"
+				},
+				"fileSystem": {
+					"value": "@dataset().ContenedorDataLake",
+					"type": "Expression"
+				}
+			},
+			"compressionCodec": "snappy"
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

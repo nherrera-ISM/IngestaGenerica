@@ -1,0 +1,137 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "value": "DF-AEU-HCL-UAT-DDRIVEN-01"
+        },
+        "LS_AZFile_connectionString": {
+            "value": "DefaultEndpointsProtocol=https;AccountName=@{linkedService().NombreCuentaAlmacenamiento};"
+        },
+        "LS_ODBC_connectionString": {
+            "value": ""
+        },
+        "LS_SQLMetaData_connectionString": {
+            "value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=dsaeuhcluatdatadriven01.database.windows.net;Initial Catalog=DBAEUHCLUATDATADRIVENPARAMS01"
+        },
+        "LS_DataverseHocol_properties_typeProperties_servicePrincipalId": {
+            "value": "1b5c53b8-b331-4bca-9bd0-19eee162505c"
+        },        
+        "LS_PWA_Projects_properties_typeProperties_url": {
+            "value": "https://ecopetrol.sharepoint.com/sites/Proyectos-Hocol/_api/ProjectData/"
+        },
+        "LS_PWA_Projects_properties_typeProperties_userName": {
+            "value": "Int.PWAProyectos@hcl.com.co"
+        },
+        "LS_SAP_CDC_properties_typeProperties_clientId": {
+            "value": "@{linkedService().Mandante}"
+        },
+        "LS_SAP_CDC_properties_typeProperties_userName": {
+            "value": "@{linkedService().NombreUsuario}"
+        },
+        "LS_SAP_CDC_properties_typeProperties_server": {
+            "value": "@{linkedService().NombreServidorSap}"
+        },
+        "LS_SAP_CDC_properties_typeProperties_systemNumber": {
+            "value": "@{linkedService().NumeroSistema}"
+        },
+        "LS_SAP_TABLE_properties_typeProperties_clientId": {
+            "value": "@{linkedService().Mandante}"
+        },
+        "LS_SAP_TABLE_properties_typeProperties_userName": {
+            "value": "@{linkedService().NombreUsuario}"
+        },
+        "LS_SAP_TABLE_properties_typeProperties_server": {
+            "value": "@{linkedService().NombreServidorSap}"
+        },
+        "LS_SAP_TABLE_properties_typeProperties_systemNumber": {
+            "value": "@{linkedService().NumeroSistema}"
+        },            
+        "LS_DataLake_properties_typeProperties_url": {
+            "value": "@{concat('https://',linkedService().NombreCuentaAlmacenamiento,'.dfs.core.windows.net/')\n\n\n}"
+        },
+        "LS_Databricks_properties_typeProperties_existingClusterId": {
+            "value": "@linkedService().ClusterID"
+        },
+        "LS_KeyVault_properties_typeProperties_baseUrl": {
+            "value": "https://KV-AEU-HCL-UAT-DDRIVEN01.vault.azure.net/"
+        },
+        "LS_MachineLearning_properties_typeProperties_subscriptionId": {
+            "value": "1f857c81-b35c-428c-880e-a424271759f0"
+        },
+        "LS_MachineLearning_properties_typeProperties_resourceGroupName": {
+            "value": "RG-AEU-HCL-UAT-DATADRIVEN"
+        },
+        "LS_MachineLearning_properties_typeProperties_mlWorkspaceName": {
+            "value": "ML-AEU-HCL-UAT-DATADRIVEN-01"
+        },
+        "LS_SQLCloud_properties_typeProperties_connectionString_secretName": {
+            "value": "@linkedService().SecretoBD"
+        },
+        "LS_SQLOnPrem_properties_typeProperties_connectionString_secretName": {
+            "value": "@linkedService().SecretoConexion"
+        },
+        "tr_finplan_archivo_ejecucionfinplan_properties_typeProperties_scope": {
+            "value": "/subscriptions/1f857c81-b35c-428c-880e-a424271759f0/resourceGroups/RG-AEU-HCL-UAT-DATADRIVEN/providers/Microsoft.Storage/storageAccounts/dlaeuhcluatdatadriven"
+        },
+
+        "PE-AEU-HCL-DDRIVEN-DBW_properties_privateLinkResourceId": {
+            "value": "/subscriptions/1f857c81-b35c-428c-880e-a424271759f0/resourceGroups/RG-AEU-HCL-UAT-DATADRIVEN/providers/Microsoft.Databricks/workspaces/DK-AEU-HCL-UAT-DATADRIVEN-1"
+        },
+        "PE-AEU-HCL-DDRIVEN-DBW_properties_groupId": {
+            "value": "databricks_ui_api"
+        },
+        "PE-AEU-HCL-DDRIVEN-DF_properties_privateLinkResourceId": {
+            "value": "/subscriptions/1f857c81-b35c-428c-880e-a424271759f0/resourceGroups/RG-AEU-HCL-UAT-DATADRIVEN/providers/Microsoft.Storage/storageAccounts/saaeuhcluatdatadriven02"
+        },
+        "PE-AEU-HCL-DDRIVEN-DF_properties_groupId": {
+            "value": "file"
+        },
+        "PE-AEU-HCL-DDRIVEN-DL_properties_privateLinkResourceId": {
+            "value": "/subscriptions/1f857c81-b35c-428c-880e-a424271759f0/resourceGroups/RG-AEU-HCL-UAT-DATADRIVEN/providers/Microsoft.Storage/storageAccounts/dlaeuhcluatdatadriven"
+        },
+        "PE-AEU-HCL-DDRIVEN-DL_properties_groupId": {
+            "value": "dfs"
+        },
+        "PE-AEU-HCL-DDRIVEN-DS_properties_privateLinkResourceId": {
+            "value": "/subscriptions/1f857c81-b35c-428c-880e-a424271759f0/resourceGroups/RG-AEU-HCL-UAT-DATADRIVEN/providers/Microsoft.Sql/servers/dsaeuhcluatdatadriven01"
+        },
+        "PE-AEU-HCL-DDRIVEN-DS_properties_groupId": {
+            "value": "sqlServer"
+        },
+        "PE-AEU-HCL-DDRIVEN-ML_properties_privateLinkResourceId": {
+            "value": "/subscriptions/1f857c81-b35c-428c-880e-a424271759f0/resourceGroups/RG-AEU-HCL-UAT-DATADRIVEN/providers/Microsoft.MachineLearningServices/workspaces/ML-AEU-HCL-UAT-DATADRIVEN-01"
+        },
+        "PE-AEU-HCL-DDRIVEN-ML_properties_groupId": {
+            "value": "amlworkspace"
+        },
+        "PE-AEU-HCL-DDRIVEN-SQLMI_properties_privateLinkResourceId": {
+            "value": "/subscriptions/1f857c81-b35c-428c-880e-a424271759f0/resourceGroups/rg-aeu-hcl-uat-corp-01/providers/Microsoft.Sql/managedInstances/miauehcluatneo01"
+        },
+        "PE-AEU-HCL-DDRIVEN-SQLMI_properties_groupId": {
+            "value": "managedInstance"
+        },
+        "PE-AEU-HCL-OFM-DS_properties_privateLinkResourceId": {
+            "value": "/subscriptions/1f857c81-b35c-428c-880e-a424271759f0/resourceGroups/RG-AEU-HCL-UAT-OFM-01/providers/Microsoft.Sql/servers/dsaeuhcluatofm01"
+        },
+        "PE-AEU-HCL-OFM-DS_properties_groupId": {
+            "value": "sqlServer"
+        },
+        "PE-AEU-HCL-IOT-DL_properties_privateLinkResourceId": {
+            "value": "/subscriptions/072274a1-cef0-449f-a483-15abe163732f/resourceGroups/RG-AEU-HCL-PRD-IIOT/providers/Microsoft.Storage/storageAccounts/dlaeuhclprdiiot"
+        },
+        "PE-AEU-HCL-IOT-DL_properties_groupId": {
+            "value": "dfs"
+        },
+        "PE-AEU-HCL-DDRIVEN-DFS-02_properties_privateLinkResourceId": {
+            "value": "/subscriptions/072274a1-cef0-449f-a483-15abe163732f/resourceGroups/RG-AEU-HCL-PRD-CORP-01/providers/Microsoft.Storage/storageAccounts/dlaeuhclprdazfiles02"
+        },
+        "PE-AEU-HCL-DDRIVEN-DFS-02_properties_groupId": {
+            "value": "file"
+        }, 
+        "tr_finplan_archivo_ejecucion_pyg_properties_typeProperties_scope": {
+            "value": "/subscriptions/1f857c81-b35c-428c-880e-a424271759f0/resourceGroups/RG-AEU-HCL-UAT-DATADRIVEN/providers/Microsoft.Storage/storageAccounts/dlaeuhcluatdatadriven"
+        }
+
+    }
+}

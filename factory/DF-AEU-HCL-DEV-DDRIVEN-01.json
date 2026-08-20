@@ -1,0 +1,21 @@
+{
+	"name": "DF-AEU-HCL-DEV-DDRIVEN-01",
+	"properties": {
+		"globalParameters": {
+			"ML_experiment_name": {
+				"type": "string",
+				"value": "EXP_MVPFINANZAS_PREDICCIONPRODUCCION"
+			},
+			"ML_pipeline_id": {
+				"type": "string",
+				"value": "7018e4e7-6b0e-44ed-9550-ee1162a2041b"
+			}
+		}
+	},
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "1fe4f04a-d516-441c-8f29-71ae6288c020",
+		"tenantId": "a4305987-cf78-4f93-9d64-bf18af65397b"
+	}
+}

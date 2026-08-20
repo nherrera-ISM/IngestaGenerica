@@ -1,0 +1,35 @@
+{
+	"name": "DS_DeltaOrigen",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_DataLakeDeltaTable",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"NombreTabla": {
+				"type": "string",
+				"defaultValue": "ofm_v_master"
+			},
+			"Esquema": {
+				"type": "string",
+				"defaultValue": "sil"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"type": "AzureDatabricksDeltaLakeDataset",
+		"typeProperties": {
+			"database": {
+				"value": "@dataset().Esquema",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().NombreTabla",
+				"type": "Expression"
+			}
+		},
+		"schema": []
+	}
+}

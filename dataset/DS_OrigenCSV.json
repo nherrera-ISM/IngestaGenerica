@@ -1,0 +1,83 @@
+{
+	"name": "DS_OrigenCSV",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_AZFile",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"NombreCuentaAlmacenamiento": {
+					"value": "@dataset().NombreCuentaAlmacenamiento",
+					"type": "Expression"
+				},
+				"NombreContenedorFile": {
+					"value": "@dataset().NombreContenedorFile",
+					"type": "Expression"
+				},
+				"NombreSecreto": {
+					"value": "@dataset().NombreSecreto",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"DirectorioRaiz": {
+				"type": "string",
+				"defaultValue": "Jefatura Tecnologias Digitales/Procesos Datos/MVP Finanzas/Desarrollo/PyG/Mabbrev"
+			},
+			"Archivo": {
+				"type": "string",
+				"defaultValue": "Mabbrev.CSV"
+			},
+			"NombreCuentaAlmacenamiento": {
+				"type": "string",
+				"defaultValue": "dlaeuhclprdazfiles02"
+			},
+			"NombreContenedorFile": {
+				"type": "string",
+				"defaultValue": "fileshare-hocol-1"
+			},
+			"NombreSecreto": {
+				"type": "string",
+				"defaultValue": "dlprddatadrivenazfiles02"
+			},
+			"DelimitadorColumna": {
+				"type": "string",
+				"defaultValue": ";"
+			},
+			"PrimerRegistroEncabezado": {
+				"type": "bool",
+				"defaultValue": true
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureFileStorageLocation",
+				"fileName": {
+					"value": "@dataset().Archivo",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().DirectorioRaiz",
+					"type": "Expression"
+				}
+			},
+			"columnDelimiter": {
+				"value": "@dataset().DelimitadorColumna",
+				"type": "Expression"
+			},
+			"escapeChar": "\\",
+			"firstRowAsHeader": {
+				"value": "@dataset().PrimerRegistroEncabezado",
+				"type": "Expression"
+			},
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

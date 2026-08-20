@@ -1,0 +1,36 @@
+{
+	"name": "DS_DestinoSQLMetaDatos",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_SQLMetaData",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Esquema": {
+				"type": "string",
+				"defaultValue": "Metadata"
+			},
+			"Tabla": {
+				"type": "string",
+				"defaultValue": "IngestaSilverConfiguracionAtributo"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@dataset().Esquema",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().Tabla",
+				"type": "Expression"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

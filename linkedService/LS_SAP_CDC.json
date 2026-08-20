@@ -1,0 +1,59 @@
+{
+	"name": "LS_SAP_CDC",
+	"properties": {
+		"description": "Permite realizar la conexión para realizar la extracción de los datos usando el tipo de conexión CDC, para varios extractores configurados en sap",
+		"parameters": {
+			"NombreServidorSap": {
+				"type": "string",
+				"defaultValue": "hclerpdes.hocol.com.co"
+			},
+			"NumeroSistema": {
+				"type": "string",
+				"defaultValue": "00"
+			},
+			"Mandante": {
+				"type": "string",
+				"defaultValue": "300"
+			},
+			"NombreSuscriptor": {
+				"type": "string",
+				"defaultValue": "ADF_DEV_SAP"
+			},
+			"SecretoUsuario": {
+				"type": "string",
+				"defaultValue": "spdevdatadrivenpw"
+			},
+			"NombreUsuario": {
+				"type": "string",
+				"defaultValue": "DL_AZURE"
+			}
+		},
+		"annotations": [],
+		"type": "SapOdp",
+		"typeProperties": {
+			"clientId": "@{linkedService().Mandante}",
+			"language": "ES",
+			"sncMode": false,
+			"userName": "@{linkedService().NombreUsuario}",
+			"subscriberName": "@{linkedService().NombreSuscriptor}",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "LS_KeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@{linkedService().SecretoUsuario}",
+					"type": "Expression"
+				}
+			},
+			"server": "@{linkedService().NombreServidorSap}",
+			"systemNumber": "@{linkedService().NumeroSistema}"
+		},
+		"connectVia": {
+			"referenceName": "IROnPremises",
+			"type": "IntegrationRuntimeReference"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/linkedservices"
+}

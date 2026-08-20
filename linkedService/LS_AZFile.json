@@ -1,0 +1,41 @@
+{
+	"name": "LS_AZFile",
+	"properties": {
+		"parameters": {
+			"NombreCuentaAlmacenamiento": {
+				"type": "string",
+				"defaultValue": "saaeuhcldevdatadriven02"
+			},
+			"NombreContenedorFile": {
+				"type": "string",
+				"defaultValue": "fileshare-datadriven"
+			},
+			"NombreSecreto": {
+				"type": "string",
+				"defaultValue": "sadevdatadriven"
+			}
+		},
+		"annotations": [],
+		"type": "AzureFileStorage",
+		"typeProperties": {
+			"connectionString": "DefaultEndpointsProtocol=https;AccountName=@{linkedService().NombreCuentaAlmacenamiento};",
+			"accountKey": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "LS_KeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@linkedService().NombreSecreto",
+					"type": "Expression"
+				}
+			},
+			"fileShare": "@{linkedService().NombreContenedorFile}"
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/linkedservices"
+}

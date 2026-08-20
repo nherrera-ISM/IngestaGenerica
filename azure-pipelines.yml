@@ -1,0 +1,39 @@
+#comentario ymeneses
+name: $(Build.SourceBranchName)_$(date:yyyyMMdd)$(rev:.r)
+trigger:
+  branches:
+    include:
+    - $(Rama)
+stages:
+- stage: __IntegracionContinuaADF
+  jobs:
+  - job: Job
+    pool:
+      name: 'Azure Pipelines'
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '14.x'
+      displayName: 'Install Node.js'
+    - task: Npm@1
+      inputs:
+        command: 'install'
+        verbose: true
+      displayName: 'Install npm package'
+    - task: Npm@1
+      inputs:
+        command: 'custom'
+        customCommand: 'run build validate $(Build.Repository.LocalPath) /subscriptions/$(IdSubscription)/resourceGroups/$(ResourceGroupName)/providers/Microsoft.DataFactory/factories/$(DataFactoryName)'
+      displayName: 'Validate'
+    - task: Npm@1
+      inputs:
+        command: 'custom'
+        customCommand: 'run build export $(Build.Repository.LocalPath) /subscriptions/$(IdSubscription)/resourceGroups/$(ResourceGroupName)/providers/Microsoft.DataFactory/factories/$(DataFactoryName) "ArmTemplate"'
+      displayName: 'Validate and Generate ARM template'
+    - task: PublishPipelineArtifact@1
+      condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+      inputs:
+        targetPath: '$(Build.Repository.LocalPath)/ArmTemplate'
+        artifact: 'ArmTemplates'
+        publishLocation: 'pipeline'

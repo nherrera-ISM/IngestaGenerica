@@ -1,0 +1,59 @@
+{
+	"name": "DS_DestinoArchivoBinario",
+	"properties": {
+		"description": "It describes the destination store.",
+		"linkedServiceName": {
+			"referenceName": "LS_DataLake",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"NombreSecreto": {
+					"value": "@dataset().SecretoKeyVConexionDestino",
+					"type": "Expression"
+				},
+				"NombreCuentaAlmacenamiento": {
+					"value": "@dataset().NombreCuentaAlmacenamientoDestino",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"Container": {
+				"type": "String"
+			},
+			"Directory": {
+				"type": "String"
+			},
+			"filename": {
+				"type": "string"
+			},
+			"NombreCuentaAlmacenamientoDestino": {
+				"type": "string"
+			},
+			"SecretoKeyVConexionDestino": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().filename",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().Directory",
+					"type": "Expression"
+				},
+				"fileSystem": {
+					"value": "@dataset().Container",
+					"type": "Expression"
+				}
+			}
+		}
+	}
+}

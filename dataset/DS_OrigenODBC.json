@@ -1,0 +1,27 @@
+{
+	"name": "DS_OrigenODBC",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_ODBC",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Tabla": {
+				"type": "string",
+				"defaultValue": "public.curve_data_by_depth"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"type": "OdbcTable",
+		"schema": [],
+		"typeProperties": {
+			"tableName": {
+				"value": "@dataset().Tabla",
+				"type": "Expression"
+			}
+		}
+	}
+}

@@ -1,0 +1,46 @@
+{
+	"name": "DS_OrigenSQLServer",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_SQLCloud",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"SecretoBD": {
+					"value": "@dataset().SecretoBD",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"Tabla": {
+				"type": "string",
+				"defaultValue": "Tabla1"
+			},
+			"Esquema": {
+				"type": "string",
+				"defaultValue": "Esquema1"
+			},
+			"SecretoBD": {
+				"type": "string",
+				"defaultValue": "miaeuhcldevdatadrivesql-sc01"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@dataset().Esquema",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().Tabla",
+				"type": "Expression"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

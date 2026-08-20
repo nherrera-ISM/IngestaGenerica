@@ -1,0 +1,85 @@
+{
+	"name": "DS_OrigenSapCdc",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_SAP_CDC",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"NombreServidorSap": {
+					"value": "@dataset().NombreServidorSap",
+					"type": "Expression"
+				},
+				"NumeroSistema": {
+					"value": "@dataset().NumeroSistema",
+					"type": "Expression"
+				},
+				"Mandante": {
+					"value": "@dataset().Mandante",
+					"type": "Expression"
+				},
+				"NombreUsuario": {
+					"value": "@dataset().NombreUsuario",
+					"type": "Expression"
+				},
+				"NombreSuscriptor": {
+					"value": "@dataset().NombreSuscriptor",
+					"type": "Expression"
+				},
+				"SecretoUsuario": {
+					"value": "@dataset().SecretoUsuario",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"NombreServidorSap": {
+				"type": "string",
+				"defaultValue": "10.125.12.205"
+			},
+			"NumeroSistema": {
+				"type": "string",
+				"defaultValue": "00"
+			},
+			"Mandante": {
+				"type": "string",
+				"defaultValue": "300"
+			},
+			"NombreUsuario": {
+				"type": "string",
+				"defaultValue": "C0806956"
+			},
+			"NombreSuscriptor": {
+				"type": "string",
+				"defaultValue": "ADF_DEV_SAP"
+			},
+			"ContextoOdp": {
+				"type": "string",
+				"defaultValue": "SAPI"
+			},
+			"NombreOdp": {
+				"type": "string",
+				"defaultValue": "0FI_GL_4"
+			},
+			"SecretoUsuario": {
+				"type": "string",
+				"defaultValue": "spdevdatadrivenpw"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenericaSap"
+		},
+		"annotations": [],
+		"type": "SapOdpResource",
+		"schema": [],
+		"typeProperties": {
+			"context": {
+				"value": "@dataset().ContextoOdp",
+				"type": "Expression"
+			},
+			"objectName": {
+				"value": "@dataset().NombreOdp",
+				"type": "Expression"
+			}
+		}
+	}
+}

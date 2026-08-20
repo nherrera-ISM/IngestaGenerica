@@ -1,0 +1,45 @@
+{
+	"name": "DS_OrigenDataverse",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_DataverseHocol",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"ServiceUri": {
+					"value": "@dataset().ServiceUri",
+					"type": "Expression"
+				},
+				"SecretName": {
+					"value": "@dataset().SecretName",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"Entidad": {
+				"type": "string",
+				"defaultValue": "crf02_jefpro_phase"
+			},
+			"ServiceUri": {
+				"type": "string",
+				"defaultValue": "https://hocoldev.crm.dynamics.com"
+			},
+			"SecretName": {
+				"type": "string",
+				"defaultValue": "dataversedevdatadriven01"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"type": "CommonDataServiceForAppsEntity",
+		"schema": [],
+		"typeProperties": {
+			"entityName": {
+				"value": "@dataset().Entidad",
+				"type": "Expression"
+			}
+		}
+	}
+}

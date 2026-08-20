@@ -1,0 +1,7 @@
+{
+	"name": "PE-AEU-HCL-OFM-DS",
+	"properties": {
+		"privateLinkResourceId": "/subscriptions/a9ba1a46-07ac-44d4-86a0-f42199471861/resourceGroups/RG-AEU-HCL-DEV-OFM-01/providers/Microsoft.Sql/servers/dsaeuhcldevofm01",
+		"groupId": "sqlServer"
+	}
+}

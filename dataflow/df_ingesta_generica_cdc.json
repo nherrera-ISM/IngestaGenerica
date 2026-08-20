@@ -1,0 +1,54 @@
+{
+	"name": "df_ingesta_generica_cdc",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_OrigenSapCdc",
+						"type": "DatasetReference"
+					},
+					"name": "SalidaCdc"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_DestinoSapParquet",
+						"type": "DatasetReference"
+					},
+					"name": "SalidaSapParquet"
+				}
+			],
+			"transformations": [],
+			"scriptLines": [
+				"parameters{",
+				"     ModoEjecucion as string ('fullAndIncrementalLoad'),",
+				"     ColumnaClave as string[] (['FISCPER']),",
+				"     NombreFiltro as string ('FISCPER'),",
+				"     ValorFiltro as string ('2022001'),",
+				"     NombreArchivo as string ('0fi_gl_12.parquet')",
+				"}",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     staged: true,",
+				"     readMode: ($ModoEjecucion),",
+				"     keys: ($ColumnaClave),",
+				"     format: 'sapObject',",
+				"     partitionPredicates: ('[[{\"FieldName\": \"' + $NombreFiltro + '\",\"Sign\":\"I\",\"Option\":\"EQ\",\"Low\": \"' + $ValorFiltro + '\"}]]'),",
+				"     partitionBy('external', 1)) ~> SalidaCdc",
+				"SalidaCdc sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     format: 'parquet',",
+				"     partitionFileNames:[(concat($NombreArchivo, '.parquet'))],",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     partitionBy('hash', 1)) ~> SalidaSapParquet"
+			]
+		}
+	}
+}

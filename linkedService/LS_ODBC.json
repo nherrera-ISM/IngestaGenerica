@@ -1,0 +1,20 @@
+{
+	"name": "LS_ODBC",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"description": "Origenes de datos tipo SQL por medio de ODBC",
+		"annotations": [],
+		"type": "Odbc",
+		"typeProperties": {
+			"connectionString": {
+				"type": "SecureString",
+				"value": "**********"
+			},
+			"authenticationType": "Anonymous"
+		},
+		"connectVia": {
+			"referenceName": "IROnPremises",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

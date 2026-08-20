@@ -1,0 +1,89 @@
+{
+	"name": "DS_OrigenSQLServerOnPrem",
+	"properties": {
+		"description": "Utilizado en la ingesta generica de las bases de datos SQL OnPremises",
+		"linkedServiceName": {
+			"referenceName": "LS_SQLOnPrem",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"SecretoConexion": {
+					"value": "@dataset().SecretoBD",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"Tabla": {
+				"type": "string",
+				"defaultValue": "dbo"
+			},
+			"Esquema": {
+				"type": "string",
+				"defaultValue": "pbi_configuracion_tableros"
+			},
+			"SecretoBD": {
+				"type": "string",
+				"defaultValue": "sqldatadrivensgpa"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"type": "SqlServerTable",
+		"schema": [
+			{
+				"name": "id",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "tablero",
+				"type": "varchar"
+			},
+			{
+				"name": "link_completo",
+				"type": "varchar"
+			},
+			{
+				"name": "link",
+				"type": "varchar"
+			},
+			{
+				"name": "report_id",
+				"type": "varchar"
+			},
+			{
+				"name": "auto_auth",
+				"type": "varchar"
+			},
+			{
+				"name": "ctid",
+				"type": "varchar"
+			},
+			{
+				"name": "config",
+				"type": "varchar"
+			},
+			{
+				"name": "estado",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "observacion",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": {
+				"value": "@dataset().Esquema",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().Tabla",
+				"type": "Expression"
+			}
+		}
+	}
+}

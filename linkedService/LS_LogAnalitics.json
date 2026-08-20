@@ -1,0 +1,17 @@
+{
+	"name": "LS_LogAnalitics",
+	"properties": {
+		"annotations": [],
+		"type": "RestService",
+		"typeProperties": {
+			"url": "https://api.loganalytics.azure.com/v1/workspaces/48282481-9fae-43e3-a8b2-ef1b7b7a41b5/",
+			"enableServerCertificateValidation": true,
+			"authenticationType": "Anonymous"
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/linkedservices"
+}

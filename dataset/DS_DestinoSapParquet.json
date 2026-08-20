@@ -1,0 +1,62 @@
+{
+	"name": "DS_DestinoSapParquet",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_DataLake",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"NombreSecreto": "NoUsar",
+				"NombreCuentaAlmacenamiento": {
+					"value": "@dataset().NombreCuentaAlmacenamiento",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"NombreSecretoCtaAlmacenamiento": {
+				"type": "string",
+				"defaultValue": "NoUsar"
+			},
+			"NombreCuentaAlmacenamiento": {
+				"type": "string",
+				"defaultValue": "dlaeuhcldevdatadriven"
+			},
+			"NombreArchivo": {
+				"type": "string",
+				"defaultValue": "archivo"
+			},
+			"ContenedorDataLake": {
+				"type": "string",
+				"defaultValue": "landing"
+			},
+			"DirectorioRaizDataLake": {
+				"type": "string",
+				"defaultValue": "hocol/registro_informacion_contable/sap/0fi_gl_12/2023/05"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenericaSap"
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().NombreArchivo",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().DirectorioRaizDataLake",
+					"type": "Expression"
+				},
+				"fileSystem": {
+					"value": "@dataset().ContenedorDataLake",
+					"type": "Expression"
+				}
+			},
+			"compressionCodec": "none"
+		},
+		"schema": []
+	}
+}

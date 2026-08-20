@@ -1,0 +1,25 @@
+{
+	"name": "LS_SharePoint_MOC",
+	"properties": {
+		"description": "Conexión a listas de sharepoint que se encuentran en el sites de ReportesJefaturaProyectos",
+		"annotations": [],
+		"type": "SharePointOnlineList",
+		"typeProperties": {
+			"siteUrl": "https://ecopetrol.sharepoint.com/sites/ReportesJefaturaProyectos",
+			"tenantId": "a4305987-cf78-4f93-9d64-bf18af65397b",
+			"servicePrincipalId": "64526229-490a-491d-81ce-5e7888ed0a87",
+			"servicePrincipalKey": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "LS_KeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "sharepointdevdatadriven01"
+			}
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

@@ -1,0 +1,54 @@
+{
+	"name": "LS_SAP_TABLE",
+	"properties": {
+		"description": "Conexión para extraer datos desde las tablas de SAP",
+		"parameters": {
+			"NombreServidorSap": {
+				"type": "string",
+				"defaultValue": "hclerpdes.hocol.com.co"
+			},
+			"NumeroSistema": {
+				"type": "string",
+				"defaultValue": "00"
+			},
+			"Mandante": {
+				"type": "string",
+				"defaultValue": "300"
+			},
+			"NombreUsuario": {
+				"type": "string",
+				"defaultValue": "DL_AZURE"
+			},
+			"SecreroUsuario": {
+				"type": "string",
+				"defaultValue": "spdevdatadrivenpw"
+			}
+		},
+		"annotations": [],
+		"type": "SapTable",
+		"typeProperties": {
+			"clientId": "@{linkedService().Mandante}",
+			"language": "ES",
+			"sncMode": false,
+			"userName": "@{linkedService().NombreUsuario}",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "LS_KeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@{linkedService().SecreroUsuario}",
+					"type": "Expression"
+				}
+			},
+			"server": "@{linkedService().NombreServidorSap}",
+			"systemNumber": "@{linkedService().NumeroSistema}"
+		},
+		"connectVia": {
+			"referenceName": "IROnPremises",
+			"type": "IntegrationRuntimeReference"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/linkedservices"
+}

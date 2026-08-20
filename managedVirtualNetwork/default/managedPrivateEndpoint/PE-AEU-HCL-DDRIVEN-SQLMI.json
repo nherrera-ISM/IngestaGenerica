@@ -1,0 +1,7 @@
+{
+	"name": "PE-AEU-HCL-DDRIVEN-SQLMI",
+	"properties": {
+		"privateLinkResourceId": "/subscriptions/1f857c81-b35c-428c-880e-a424271759f0/resourceGroups/rg-aeu-hcl-uat-corp-01/providers/Microsoft.Sql/managedInstances/miauehcluatneo01",
+		"groupId": "managedInstance"
+	}
+}

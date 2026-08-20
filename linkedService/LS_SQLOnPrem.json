@@ -1,0 +1,32 @@
+{
+	"name": "LS_SQLOnPrem",
+	"properties": {
+		"description": "Conexión onPrem",
+		"parameters": {
+			"SecretoConexion": {
+				"type": "string",
+				"defaultValue": "cnProactivaNetSQLPANETDB"
+			}
+		},
+		"annotations": [],
+		"type": "SqlServer",
+		"typeProperties": {
+			"connectionString": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "LS_KeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@linkedService().SecretoConexion",
+					"type": "Expression"
+				}
+			}
+		},
+		"connectVia": {
+			"referenceName": "IROnPremises",
+			"type": "IntegrationRuntimeReference"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/linkedservices"
+}

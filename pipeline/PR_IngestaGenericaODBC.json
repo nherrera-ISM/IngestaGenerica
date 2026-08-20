@@ -1,0 +1,351 @@
+{
+	"name": "PR_IngestaGenericaODBC",
+	"properties": {
+		"description": "Canalización para realizar la ingesta genérica solo para Origenes ODBC",
+		"activities": [
+			{
+				"name": "Ingesta Generar Consultas",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Metadata].[IngestaGenerarConsultas]",
+					"storedProcedureParameters": {
+						"NombreExtraccion": {
+							"value": {
+								"value": "@pipeline().parameters.NombreExtraccion",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PipelineRunId": {
+							"value": {
+								"value": "@pipeline().RunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Proyecto": {
+							"value": {
+								"value": "@pipeline().parameters.Proyecto",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Tema": {
+							"value": {
+								"value": "@pipeline().parameters.Tema",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "LS_SQLMetaData",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "ActualizarConfiguracion",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Para cada Entidad Odbc",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Metadata].[IngestaActualizarConfiguracion]",
+					"storedProcedureParameters": {
+						"PipelineRunId": {
+							"value": {
+								"value": "@pipeline().RunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "LS_SQLMetaData",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Ingesta Odbc",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Ingesta Generar Consultas",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select IdIngestaEjecucion\n\t,DirectorioDestino\n\t,Eje.NombreArchivoDestino\n\t,TablaOrigen = ArchivoOrigen\n\t,EsquemaOrigen = EsquemaOrigen_DirectorioRaiz\n\t,ContenedorDestino\n\t,NombreCuentaAlmacenamiento\n\t,SecretoCuentaAlmacenamiento\n\t,SecretoKeyVConexionOrigen\nFrom [Metadata].[IngestaEjecucion] Eje\n\tInner Join [Metadata].[IngestaConfiguracion] Conf\n\tOn Eje.IdIngestaConfiguracion = Conf.IdIngestaConfiguracion\nWhere  TipoExtraccion = 'Odbc'\n\tAnd Proyecto = '@{pipeline().parameters.Proyecto}'\n\tAnd Tema = Case When '@{pipeline().parameters.Tema}' ='*' Then Tema Else '@{pipeline().parameters.Tema}' End\n\tAnd  NombreExtraccion = Case When '@{pipeline().parameters.NombreExtraccion}' = '*' Then NombreExtraccion Else '@{pipeline().parameters.NombreExtraccion}' End \n\tAnd Eje.Estado = 'Pendiente'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_OrigenSQLMetaDatos",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Para cada Entidad Odbc",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Ingesta Odbc",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Ingesta Odbc').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Leer cada entidad Odbc",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "EsquemaOrigen",
+									"value": "@item().EsquemaOrigen"
+								},
+								{
+									"name": "TablaOrigen",
+									"value": "@item().TablaOrigen"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "OdbcSource",
+									"queryTimeout": "02:00:00"
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_OrigenODBC",
+									"type": "DatasetReference",
+									"parameters": {
+										"Tabla": {
+											"value": "@item().TablaOrigen",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_DestinoParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"DirectorioRaizDataLake": {
+											"value": "@item().DirectorioDestino",
+											"type": "Expression"
+										},
+										"NombreArchivo": {
+											"value": "@item().NombreArchivoDestino",
+											"type": "Expression"
+										},
+										"ContenedorDataLake": {
+											"value": "@item().ContenedorDestino",
+											"type": "Expression"
+										},
+										"NombreCuentaAlmacenamiento": {
+											"value": "@item().NombreCuentaAlmacenamiento",
+											"type": "Expression"
+										},
+										"NombreSecretoCtaAlmacenamiento": {
+											"value": "@item().SecretoCuentaAlmacenamiento",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "CerrarConExito_EntidadOdbc",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Leer cada entidad Odbc",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Exito",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('{\"DuracionSeg\":\"'\n        , activity('Leer cada entidad Odbc').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , activity('Leer cada entidad Odbc').output.rowsCopied\n        , '\", \"MensajeUsuario\":\"Carga Exitosa\"  }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "CerrarConFallo_EntidadOdbc",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Leer cada entidad Odbc",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Metadata].[IngestaCerrarEjecucion]",
+								"storedProcedureParameters": {
+									"Estado": {
+										"value": "Error",
+										"type": "String"
+									},
+									"IdIngestaEjecucion": {
+										"value": {
+											"value": "@item().IdIngestaEjecucion",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"Mensaje": {
+										"value": {
+											"value": "@Concat('{\"DuracionSeg\":\"'\n        , activity('Leer cada entidad Odbc').output.copyDuration\n        , '\", \"FilasCopiadas\":\"'\n        , ''\n        , '\", \"MensajeUsuario\":\"'\n        , 'Carga Fallida'  \n        , '\", \"MensajeTecnico\":\"'\n        , activity('Leer cada entidad Odbc').error.Message  \n        ,'\" }'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_SQLMetaData",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"Proyecto": {
+				"type": "string",
+				"defaultValue": "Datamart Proyectos"
+			},
+			"Tema": {
+				"type": "string",
+				"defaultValue": "Caracterizacion_Proyectos"
+			},
+			"NombreExtraccion": {
+				"type": "string",
+				"defaultValue": "*"
+			}
+		},
+		"folder": {
+			"name": "IngestaGenerica"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-10-11T16:11:29Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
